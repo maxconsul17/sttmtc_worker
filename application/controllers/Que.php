@@ -132,8 +132,8 @@ class Que extends CI_Controller {
         // Prepare date range
         $data["actual_dates"] = [$det->dfrom, $det->dto];
         $dates = $this->time->generateMonthDates($det->dfrom);
-        $det->dfrom = $dates["first_date"];
-        $det->dto = $dates["last_date"];
+        // $det->dfrom = $dates["first_date"];
+        // $det->dto = $dates["last_date"];
 
         // Fetch employees for the report
         $employeelist = $this->worker_model->getEmployeeList($det->where_clause);
@@ -164,6 +164,9 @@ class Que extends CI_Controller {
 				$data['campus'] = $employee->campusid;
 				$data['employeeid'] = $employee->employeeid;
 				$data['attendance'] = $this->worker_model->getEmployeeDTR($employee->employeeid, $det->dfrom, $det->dto, $isteaching);
+                $data['dtrcutoff'] = date('F d, Y', strtotime($det->dfrom)) . ' - ' . date('F d, Y', strtotime($det->dto));
+                // echo "<pre>";print_r($data['attendance']);die;
+                // echo "<pre>";print_r($data);die;
 
 				// Load the appropriate report view
 				$report = $this->load->view(

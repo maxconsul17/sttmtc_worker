@@ -1,5 +1,4 @@
 <?php 
-
     $style = '
     <style>
         .form_no{
@@ -16,7 +15,6 @@
             width:100%;
             height:100%;
             font-size:18px;
-            font-family:calibri;
         }
 
         .main-table{
@@ -26,7 +24,7 @@
 
         .main-table td{
             border: 1px solid black;
-            font-size:12px;
+            font-size:18px;
         }
 
         .title{
@@ -48,13 +46,6 @@
         .m10{
             margin-top:10px;
         }
-        .header{
-            background-color: #65d73a;
-            color: white;
-        }
-        .td-height{
-            height: 20px;
-        }
     </style>';
 
     $fullname = $this->worker_model->getEmployeeName($employeeid);
@@ -69,49 +60,62 @@
                 <td style="padding-right: 18px;" id="dtr-content">
                     <div class="container main-wrapper">
                         <table class="table-header">
-                            <tr><td class="form_no"><i></i></td></tr>
-                            <tr><td class="tc title"><img src="images/school_logo_with_desc.png" style="width: 400;"/></td></tr>
-                            <tr><td class="tc" style="font-size:15px;"><strong>EMPLOYEE ATTENDANCE</strong></td></tr>
-                            <tr><td class="tc" style="font-size:11px;"><strong>'.$dtrcutoff.'</strong></td></tr>
+                            <tr><td class="form_no"><i>Civil Service Form No. 48</i></td></tr>
+                            <tr><td class="tc tb title">'.strtoupper("DAILY TIME RECORD").'</td></tr>
+                            <tr><td class="tc"><h3>-----o0o-----</h3></td></tr>
+                            <tr><td class="tc name">'.$fullname.'</td></tr>
+                            <tr><td><hr></td></tr>
+                            <tr><td class="tc" style="font-size:20px;">NAME</td></tr>
                         </table>
                         <br>
-
-                        <table style="font-size:11px;width:100%">
+                        <table class="table-header" style="font-size:15px;">
                             <tr>
-                            <td><strong>Employee Name: '.$fullname.'</strong></td>
-                            <td><strong>Campus: '.$campus.'</strong></td>
-                            </tr>
-                            <tr>
-                            <td><strong>Employee ID: '.$employeeid.'</strong></td>
-                            <td><strong>Office: '.$department.'</strong></td>
+                                <td width="22%">For the month of</td> 
+                                <td width="78%">'.strtoupper($month_of).'<hr style="margin: 0px; padding: 0px;"></td>
                             </tr>
                         </table>
-
+                        <table class="sub-header m10">
+                            <tr>
+                                <td style="font-size:15px;">Official hours for arrival</td>
+                                <td style="font-size:15px;">Regular <br>Days</td>
+                                <td style="width:100px;font-size:15px;"><hr></td>
+                            </tr>
+                            <tr>
+                                <td style="padding-left:15px;font-size:15px;">and departure</td>
+                                <td style="font-size:15px;">Saturdays</td>
+                                <td style="font-size:15px;"><hr></td>
+                            </tr>
+                        </table>
 
                         <table class="main-table m10" style="font-size:19px;">
                             <tr>
-                                <td rowspan="2" class="tc header" style="width:20%">Date</td>
-                                <td class="tc header" colspan="2" style="width:20%">Actual Log Time</td>
-                                <td class="tc header" rowspan="2" style="width:25%">Remarks/Others</td>
-                                <td class="tc header" rowspan="2"  style="width:25%">Holiday</td>
+                                <td class="tc" rowspan="2">Day</td>
+                                <td class="tc" colspan="2">A.M</td>
+                                <td class="tc" colspan="2">P.M</td>
+                                <td class="tc" colspan="2">Undertime/late</td>
+                                <td></td>
                             </tr>
                             <tr>
-                                <td class="tc header">IN</td>
-                                <td class="tc header">OUT</td>
-                            </tr>
-                            ';
+                                <td class="tc">Arrival</td>
+                                <td class="tc">Departure</td>
+                                <td class="tc">Arrival</td>
+                                <td class="tc">Departure</td>
+                                <td class="tc">Hours</td>
+                                <td class="tc">Minutes</td>
+                                <td class="tc">Remarks</td>
+                            </tr>';
 
                             foreach ($attendance as $date_arr => $att_date) {
                                 $AM_arrival = $AM_departure = $PM_arrival = $PM_departure = $hour = $minute = $remarks = "";
                                 if($att_date){
                                     $date = $this->time->DayFormatted($date_arr);
-                                    $AM_arrival = (isset($att_date[0]) ? $att_date[0]->actlog_time_in : '');
-                                    $AM_departure = (isset($att_date[0]) ?$att_date[0]->actlog_time_out : '');
+                                    $AM_arrival = (isset($att_date[0]) ? $this->time->formatTimeOutputNew($att_date[0]->actlog_time_in, true) : '');
+                                    $AM_departure = (isset($att_date[0]) ?$this->time->formatTimeOutputNew($att_date[0]->actlog_time_out, true) : '');
 
                                     $lastDataIndexPerDate = count($att_date)-1; //Para makuha yung pinaka last out nya 
 
-                                    $PM_arrival = (isset($att_date[$lastDataIndexPerDate]) && count($att_date) > 1 ? $att_date[$lastDataIndexPerDate]->actlog_time_in:'');
-                                    $PM_departure = (isset($lastDataIndexPerDate) && count($att_date) > 1 ? $this->time->$att_date[$lastDataIndexPerDate]->actlog_time_out:'');
+                                    $PM_arrival = (isset($att_date[$lastDataIndexPerDate]) && count($att_date) > 1 ? $this->time->formatTimeOutputNew($att_date[$lastDataIndexPerDate]->actlog_time_in, true):'');
+                                    $PM_departure = (isset($lastDataIndexPerDate) && count($att_date) > 1 ? $this->time->formatTimeOutputNew($att_date[$lastDataIndexPerDate]->actlog_time_out, true):'');
 
                                     $late = $this->time->exp_time($att_date[0]->late);
                                     $undertime = $this->time->exp_time($att_date[0]->undertime);
@@ -182,40 +186,77 @@
                                 $hour = $minute = 0;
                                 $att_mirror .= '
                                 <tr>
-                                    <td class="tc" rowspan=2>'.(date("d-M (l)",strtotime($date_arr))).'</td>
-                                    <td class="tc td-height">'.$AM_arrival.'</td>
-                                    <td class="tc td-height">'.$AM_departure.'</td>
-                                    <td class="tc" rowspan=2 >'.$remarks.'</td>
-                                    <td> </td>
-                                </tr>
-                                <tr>
-                                    <td class="tc td-height">'.$PM_arrival.'</td>
-                                    <td class="tc td-height">'.$PM_departure.'</td>
-                                </tr>'
-                                ;
+                                    <td class="tc">'.($this->time->DayFormatted($date_arr)).'</td>
+                                    <td class="tc">'.$AM_arrival.'</td>
+                                    <td class="tc">'.$AM_departure.'</td>
+                                    <td class="tc">'.$PM_arrival.'</td>
+                                    <td class="tc">'.$PM_departure.'</td>
+                                    <td class="tc">'.(($hour != 0) ? $hour : '').'</td>
+                                    <td class="tc">'.(($minute != 0) ? $minute : '').'</td>
+                                    <td class="tc">'.$remarks.'</td>
+                                </tr>';
                             }
 
                         $att_mirror .= '
                                 <tr>
-                                    <td style="font-size:18px;" colspan="5" style="text-align:left;">Total: </td>
+                                    <td style="font-size:18px;" colspan="5" style="text-align:right;">Total: </td>
+                                    <td style="font-size:18px;"></td>
+                                    <td style="font-size:18px;"></td>
+                                    <td style="font-size:18px;"></td>
                                 </tr>
                             </table>
                     </div>
-                    <br>
                     
-                    <table class="regards" style="width:100%;font-size:11px;">
-                        <tr class="align_right">
-                            <td>Acknowledged by : </td>
-                            <td> _________________________________________ </td>
-                            <td>Certified by : </td>
-                            <td> _________________________________________ </td>
+                    <br>
+                    <table class="regards" style="width:100%;margin-left:15px;">
+                        <tr>
+                            <td style="font-size:18px;">
+                                I certify on my honor that the above is a true and correct report of the hours of work performed, record of which was made daily at the time of arrival and departure from office.
+                            </td>
                         </tr>
                     </table>
 
+                    <br>
+                    <table class="regards" style="width:100%;margin-left:15px;text-align:center;">
+                        <tr>
+                            <td style="vertical-align:bottom;font-size:18px;">
+                                <b><span>'.$fullname.'</span></b>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                ____________________________________________________________________________________
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="font-size:18px;">
+                                <i>VERIFIED as to the prescribed office hours :</i>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><span style="color:white;">BLANK SPACE</span></td>
+                        </tr>
+                    
+                        <tr>
+                            <td>
+                                ____________________________________________________________________________________
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="font-size:18px;">
+                                <i>In-charge</i>
+                            </td>
+                        </tr>
+                    </table>
 
                 </td>';
 
-            $content = $content.$att_mirror;
+            $content = $content.$att_mirror.$att_mirror;
 
            $content.=' </tr>
         </table>';

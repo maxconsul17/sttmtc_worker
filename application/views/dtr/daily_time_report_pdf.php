@@ -55,9 +55,11 @@
 
     // Collect all content and write to the PDF
     $content = ob_get_clean();
+    // echo $content;die;
     $mpdf->WriteHTML($content);
 
     // Save the generated PDF
     $mpdf->Output($path, "F");
+    // $mpdf->Output();die;
 
 ?>
