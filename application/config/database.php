@@ -75,10 +75,10 @@ $query_builder = TRUE;
 
 $db['default'] = array(
 	'dsn'	=> '',
-	'hostname' => getenv('DB_HOST'),
-	'username' => getenv('DB_USERNAME'),
-	'password' => getenv('DB_PASSWORD'),
-	'database' =>  $_SERVER['DB_NAME'],
+	'hostname' => "192.168.0.47",
+	'username' => "admin",
+	'password' => "PT!HR!SSth3res3",
+	'database' =>  "HRIS_STTHRESE_LA_FIESTA",
 	'database_files' =>  getenv('DB_DATABASE_FILE'),
 	'dbdriver' => 'mysqli',
 	'dbprefix' => '',
