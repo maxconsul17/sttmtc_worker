@@ -143,6 +143,12 @@ class Worker_model extends CI_Model {
     	else return "Not assigned";
     }
 
+    public function getEmployeeOffice($employeeid){
+    	$q_office = $this->db->query("SELECT description FROM employee a INNER JOIN code_office b ON a.`office` = b.`code` WHERE employeeid = '$employeeid' ");
+    	if($q_office->num_rows() > 0) return $q_office->row()->description;
+    	else return "Not assigned";
+    }
+
     public function getemployeestatus($empstatus=""){
         $returns = "";
         $q = $this->db->query("SELECT code,description FROM code_status WHERE code='$empstatus'")->result();

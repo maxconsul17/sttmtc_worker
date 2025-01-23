@@ -60,7 +60,7 @@
     $fullname = $this->worker_model->getEmployeeName($employeeid);
     $campus = $this->worker_model->getEemployeeCurrentData($employeeid, 'campusid');
     $employmentstat = $this->worker_model->getemployeestatus($this->worker_model->getEemployeeCurrentData($employeeid, 'employmentstat'));
-    $department = $this->worker_model->getEmployeeDepartment($employeeid);
+    $office = $this->worker_model->getEmployeeOffice($employeeid);
     
     $content = '
         <table style="width:100%;height:100%;">
