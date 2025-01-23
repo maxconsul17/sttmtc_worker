@@ -54,7 +54,7 @@ class Worker_model extends CI_Model {
         LEFT JOIN `code_department` b on a.`deptid` = b.`code` 
         LEFT JOIN `code_position` c on a.`positionid` = c.`positionid` 
         LEFT JOIN `code_status` d on a.`employmentstat` = d.`code`
-        WHERE 1 = 1 $where ORDER BY fullname ASC")->result();
+        WHERE a.employee_uuid <> '' $where ORDER BY fullname ASC")->result();
     }
 
     public function getempteachingtype($user = ""){
