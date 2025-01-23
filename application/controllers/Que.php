@@ -17,8 +17,6 @@ class Que extends CI_Controller {
 
     // Main entry point for the controller
     public function index(){
-        var_dump($_SERVER["DB_NAME"]); die;
-        
         // $this->db->query("UPDATE report_list SET status = 'qweqwe'");
         // sleep(1); // Delaying execution for 5 seconds (could be for load balancing or delay purpose)
         
