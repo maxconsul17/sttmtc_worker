@@ -60,7 +60,7 @@
     $fullname = $this->worker_model->getEmployeeName($employeeid);
     $campus = $this->worker_model->getEemployeeCurrentData($employeeid, 'campusid');
     $employmentstat = $this->worker_model->getemployeestatus($this->worker_model->getEemployeeCurrentData($employeeid, 'employmentstat'));
-    $office = $this->worker_model->getEmployeeOffice($employeeid);
+    $department = $this->worker_model->getEmployeeDepartment($employeeid);
     
     $content = '
         <table style="width:100%;height:100%;">
@@ -83,7 +83,7 @@
                             </tr>
                             <tr>
                             <td><strong>Employee ID: '.$employeeid.'</strong></td>
-                            <td><strong>Office: '.$office.'</strong></td>
+                            <td><strong>Office: '.$department.'</strong></td>
                             </tr>
                         </table>
 
