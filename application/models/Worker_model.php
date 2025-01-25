@@ -54,7 +54,7 @@ class Worker_model extends CI_Model {
         LEFT JOIN `code_department` b on a.`deptid` = b.`code` 
         LEFT JOIN `code_position` c on a.`positionid` = c.`positionid` 
         LEFT JOIN `code_status` d on a.`employmentstat` = d.`code`
-        WHERE 1 = 1 $where ORDER BY fullname ASC")->result();
+        WHERE a.employee_uuid <> '' $where ORDER BY fullname ASC")->result();
     }
 
     public function getempteachingtype($user = ""){
@@ -140,6 +140,12 @@ class Worker_model extends CI_Model {
     public function getEmployeeDepartment($employeeid){
     	$q_dept = $this->db->query("SELECT description FROM employee a INNER JOIN code_department b ON a.`deptid` = b.`code` WHERE employeeid = '$employeeid' ");
     	if($q_dept->num_rows() > 0) return $q_dept->row()->description;
+    	else return "Not assigned";
+    }
+
+    public function getEmployeeOffice($employeeid){
+    	$q_office = $this->db->query("SELECT description FROM employee a INNER JOIN code_office b ON a.`office` = b.`code` WHERE employeeid = '$employeeid' ");
+    	if($q_office->num_rows() > 0) return $q_office->row()->description;
     	else return "Not assigned";
     }
 
