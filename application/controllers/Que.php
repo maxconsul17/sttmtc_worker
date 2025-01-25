@@ -115,6 +115,15 @@ class Que extends CI_Controller {
             "dto" => $dto
         );
 
+        $filter = array(
+            "employeeid" => $employeeid,
+            "dfrom" => $dfrom,
+            "dto" => $dto
+        );
+        $this->db->where($filter)
+         ->set('status', "done")
+         ->update('employee_to_calculate');
+
         // Insert attendance calculation history to the database
         $this->db->insert("att_calc_history", $calc_history);
     }
