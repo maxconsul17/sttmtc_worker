@@ -30,7 +30,7 @@ class Que extends CI_Controller {
             $this->init_process_dtr();  // Initialize and process DTR tasks
         }
 
-        if($has_pending == 0){
+        if($has_pending == 0 && $print_ongoing == 0 && $print_rendering == 0){
             // Run the calculate
             $this->init_calculate();
         }
