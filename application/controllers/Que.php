@@ -147,7 +147,7 @@ class Que extends CI_Controller {
 
         // Fetch employees for the report
         $employeelist = $this->worker_model->getEmployeeList($det->where_clause);
-        if (empty($employeelist) || count($employeelist) == 0) {
+        if (empty($employeelist)) {
             $this->worker_model->updateReportStatus($det->id, "", "No employee to generate");
             return;
         }
