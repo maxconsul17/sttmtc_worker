@@ -32,7 +32,7 @@ class Que extends CI_Controller {
 
         if($has_pending == 0 && $print_ongoing == 0 && $print_rendering == 0){
             // Run the calculate
-            // $this->init_calculate();
+            $this->init_calculate();
         }
     }
 
@@ -147,7 +147,7 @@ class Que extends CI_Controller {
 
         // Fetch employees for the report
         $employeelist = $this->worker_model->getEmployeeList($det->where_clause);
-        if (empty($employeelist)) {
+        if (empty($employeelist) || count($employeelist) == 0) {
             $this->worker_model->updateReportStatus($det->id, "", "No employee to generate");
             return;
         }
