@@ -195,9 +195,16 @@ class Que extends CI_Controller {
 				$data["report_list"] = [["report" => $report]];
 				$data["path"] = "files/reports/pdf/{$employee->employeeid}_{$det->id}.pdf";
 
-				// Save the report breakdown and generate the PDF
-				$this->worker_model->save_report_breakdown($report_data);
-				$this->load->view('dtr/daily_time_report_pdf', $data);
+                // ADDITIONAL TRY CATCH FOR ERROR HANDLING
+                try {
+                    // Save the report breakdown and generate the PDF
+                    $this->worker_model->save_report_breakdown($report_data);
+                    $this->load->view('dtr/daily_time_report_pdf', $data);
+                }catch (Exception $e) {
+                    $this->worker_model->updateReportStatus($det->id, "", "error encountered");
+                    continue;
+                }
+
 			}catch (Exception $e) {
                 $this->worker_model->updateReportStatus($det->id, "", "error encountered");
 				continue;
