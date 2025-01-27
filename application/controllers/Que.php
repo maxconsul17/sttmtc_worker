@@ -21,7 +21,7 @@ class Que extends CI_Controller {
         // sleep(1); // Delaying execution for 5 seconds (could be for load balancing or delay purpose)
         
         // Check if there are pending, ongoing or rendering reports
-        $has_pending = $this->db->query("SELECT id FROM report_list WHERE status = 'ongoing' ")->num_rows();
+        $has_pending = $this->db->query("SELECT id FROM report_list WHERE status = 'pending' ")->num_rows();
         $print_ongoing = $this->db->query("SELECT id FROM report_list WHERE status = 'ongoing' ")->num_rows();
         $print_rendering = $this->db->query("SELECT id FROM report_list WHERE status = 'rendering' ")->num_rows();
         
@@ -32,7 +32,7 @@ class Que extends CI_Controller {
 
         if($has_pending == 0 && $print_ongoing == 0 && $print_rendering == 0){
             // Run the calculate
-            // $this->init_calculate();
+            $this->init_calculate();
         }
     }
 

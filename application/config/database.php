@@ -73,22 +73,22 @@ defined('BASEPATH') OR exit('No direct script access allowed');
 $active_group = 'default';
 $query_builder = TRUE;
 
-// $file = '/var/www/html/hris/application/config/server_vars.json';
-// if (file_exists($file)) {
-// 	$serverVars = json_decode(file_get_contents($file), true);
-// 	if (is_array($serverVars)) {
-// 		foreach ($serverVars as $key => $value) {
-// 			$_SERVER[$key] = $value;
-// 		}
-// 	}
-// }
+$file = '/var/www/html/hris/application/config/server_vars.json';
+if (file_exists($file)) {
+	$serverVars = json_decode(file_get_contents($file), true);
+	if (is_array($serverVars)) {
+		foreach ($serverVars as $key => $value) {
+			$_SERVER[$key] = $value;
+		}
+	}
+}
 
 $db['default'] = array(
 	'dsn'	=> '',
 	'hostname' => "192.168.0.47",
 	'username' => "admin",
 	'password' => "PT!HR!SSth3res3",
-	'database' =>  "HRIS_STTHRESE_LA_FIESTA",
+	'database' =>  $GLOBALS['_SERVER']['DB_NAME'],
 	'database_files' =>  getenv('DB_DATABASE_FILE'),
 	'dbdriver' => 'mysqli',
 	'dbprefix' => '',
