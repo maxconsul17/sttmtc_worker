@@ -20,10 +20,16 @@ class Que extends CI_Controller {
         // $this->db->query("UPDATE report_list SET status = 'qweqwe'");
         // sleep(1); // Delaying execution for 5 seconds (could be for load balancing or delay purpose)
         
+        // Enable query caching for this section
+        $this->db->cache_on();
+
         // Check if there are pending, ongoing or rendering reports
         $has_pending = $this->db->query("SELECT id FROM report_list WHERE status = 'pending' ")->num_rows();
         $print_ongoing = $this->db->query("SELECT id FROM report_list WHERE status = 'ongoing' ")->num_rows();
         $print_rendering = $this->db->query("SELECT id FROM report_list WHERE status = 'rendering' ")->num_rows();
+
+        // Disable query caching after the queries
+        $this->db->cache_off();
         
         // If there are no ongoing or rendering reports, initiate the DTR processing and generation
         if ($print_ongoing == 0 && $print_rendering == 0) {
@@ -38,7 +44,11 @@ class Que extends CI_Controller {
 
     // Task to reprocess attendance logs based on a schedule
     public function init_calculate(){
+        // Enable query caching for this section
+        $this->db->cache_on();
         $emp_list = $this->worker_model->fetch_emp_calculate();  // Fetch list of employees with attendance tasks
+        // Disable query caching after the queries
+        $this->db->cache_off();
         
         // Loop through each employee and reprocess their attendance if applicable
         if ($emp_list->num_rows() > 0) {
