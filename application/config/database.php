@@ -94,8 +94,8 @@ $db['default'] = array(
 	'dbprefix' => '',
 	'pconnect' => FALSE,
 	'db_debug' => (ENVIRONMENT !== 'production'),
-	'cache_on' => FALSE,
-	'cachedir' => '',
+	'cache_on' => TRUE, // Enable query caching
+    'cachedir' => APPPATH . 'cache/db_queries/', // Set the cache directory
 	'char_set' => 'utf8',
 	'dbcollat' => 'utf8_general_ci',
 	'swap_pre' => '',
@@ -104,5 +104,6 @@ $db['default'] = array(
 	'stricton' => FALSE,
 	'failover' => array(),
 	'save_queries' => TRUE,
+	'pconnect' => TRUE, 
 	'faceServer' => 'http://43.255.106.203:8190/'
 );
