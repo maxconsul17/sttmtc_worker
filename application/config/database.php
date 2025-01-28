@@ -92,7 +92,6 @@ $db['default'] = array(
 	'database_files' =>  getenv('DB_DATABASE_FILE'),
 	'dbdriver' => 'mysqli',
 	'dbprefix' => '',
-	'pconnect' => FALSE,
 	'db_debug' => (ENVIRONMENT !== 'production'),
 	'cache_on' => TRUE, // Enable query caching
     'cachedir' => APPPATH . 'cache/db_queries/', // Set the cache directory
