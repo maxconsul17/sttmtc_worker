@@ -19,6 +19,7 @@ class Que extends CI_Controller {
     public function index(){
         // $this->db->query("UPDATE report_list SET status = 'qweqwe'");
         sleep(60); // Delaying execution for 5 seconds (could be for load balancing or delay purpose)
+        $this->db->insert("check_cron_exec", ["test_val" => "test"]);
         
         // Enable query caching for this section
         $this->db->cache_on();
