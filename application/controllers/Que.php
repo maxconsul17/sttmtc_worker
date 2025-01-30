@@ -209,7 +209,7 @@ class Que extends CI_Controller {
                 try {
                     // Save the report breakdown and generate the PDF
                     $this->worker_model->save_report_breakdown($report_data);
-                    $this->load->view('dtr/daily_time_report_pdf', $data);
+                    // $this->load->view('dtr/daily_time_report_pdf', $data);
                 }catch (Exception $e) {
                     $this->worker_model->updateReportStatus($det->id, "", "error encountered");
                     continue;
