@@ -18,8 +18,7 @@ class Que extends CI_Controller {
     // Main entry point for the controller
     public function index(){
         // $this->db->query("UPDATE report_list SET status = 'qweqwe'");
-        sleep(60); // Delaying execution for 5 seconds (could be for load balancing or delay purpose)
-        $this->db->insert("check_cron_exec", array("test_val" => "test"));
+        // sleep(1); // Delaying execution for 5 seconds (could be for load balancing or delay purpose)
         
         // Enable query caching for this section
         $this->db->cache_on();
@@ -210,7 +209,7 @@ class Que extends CI_Controller {
                 try {
                     // Save the report breakdown and generate the PDF
                     $this->worker_model->save_report_breakdown($report_data);
-                    // $this->load->view('dtr/daily_time_report_pdf', $data);
+                    $this->load->view('dtr/daily_time_report_pdf', $data);
                 }catch (Exception $e) {
                     $this->worker_model->updateReportStatus($det->id, "", "error encountered");
                     continue;
