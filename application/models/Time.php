@@ -30,6 +30,18 @@ class Time extends CI_Model {
             return $date;
     }
 
+   // Transform hours like "1:45" into the total number of minutes, "105". 
+   function hoursToMinutes($hours) 
+   { 
+       $minutes = 0; 
+       if (strpos($hours, ':') !== false) 
+       { 
+           // Split hours and minutes. 
+           list($hours, $minutes) = explode(':', $hours); 
+            return $hours * 60 + $minutes; 
+       } 
+   }
+
     public function tableVeticalSpacer($count){
         while ($count>0){
             echo "<tr><td></td></tr>";
