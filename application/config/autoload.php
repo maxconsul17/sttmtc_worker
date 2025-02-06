@@ -89,7 +89,7 @@ $autoload['drivers'] = array();
 |
 |	$autoload['helper'] = array('url', 'file');
 */
-$autoload['helper'] = array("url",'globals');
+$autoload['helper'] = array("url");
 
 /*
 | -------------------------------------------------------------------
@@ -132,4 +132,4 @@ $autoload['language'] = array();
 |
 |	$autoload['model'] = array('first_model' => 'first');
 */
-$autoload['model'] = array('worker_model', 'time', 'recompute','attcompute','utils','payroll','employee','attendance','extensions','payrolloptions','extras','hr_reports');
+$autoload['model'] = array('worker_model', 'time');

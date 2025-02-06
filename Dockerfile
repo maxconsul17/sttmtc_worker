@@ -9,24 +9,24 @@ RUN chmod -R 777 /tmp
 RUN chown -R www-data:www-data /tmp
 
 # Install cron and curl
-RUN apt-get update && apt-get install -y cron curl
+RUN apt-get update && apt-get install -y cron curl unzip
 
-# Create a script to run the curl command
-RUN echo '#!/bin/bash' > /usr/local/bin/curl_localhost.sh && \
-    echo 'while true; do curl -s http://localhost > /dev/null 2>&1; sleep 1; done' >> /usr/local/bin/curl_localhost.sh && \
-    chmod +x /usr/local/bin/curl_localhost.sh
+# Create a script to run the PHP worker once
+# RUN echo '#!/bin/bash' > /usr/local/bin/run_worker.sh && \
+#     echo 'php /var/www/html/hris/index.php worker/listen > /dev/null 2>&1' >> /usr/local/bin/run_worker.sh && \
+#     chmod +x /usr/local/bin/run_worker.sh
 
-# Set up the cron job
-RUN echo '* * * * * root for i in {0..2}; do /usr/local/bin/curl_localhost.sh; sleep 2; done' > /etc/cron.d/curl_cron && \
-    chmod 0644 /etc/cron.d/curl_cron
+# Set up a cron job to run the script at system boot
+RUN echo '@reboot root /usr/local/bin/run_worker.sh' > /etc/cron.d/worker_cron && \
+    chmod 0644 /etc/cron.d/worker_cron
 
 # Ensure cron job is running
-RUN crontab /etc/cron.d/curl_cron
+RUN crontab /etc/cron.d/worker_cron
 
 # Create an entrypoint script to run both cron and apache2
 RUN echo '#!/bin/bash' > /entrypoint.sh && \
     echo 'service cron start' >> /entrypoint.sh && \
-    echo 'apache2-foreground' >> /entrypoint.sh && \
+    # echo 'php /var/www/html/hris/index.php worker/listen' >> /entrypoint.sh && \
     chmod +x /entrypoint.sh
 
 # Set the entrypoint

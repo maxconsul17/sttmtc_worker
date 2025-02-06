@@ -3,11 +3,18 @@ defined('BASEPATH') OR exit('No direct script access allowed');
 
 class Worker_model extends CI_Model {
 
+    public $tables = ['report_list'];
+
 	public function fetch_emp_calculate()
 	{           
         $this->db->where("status", "pending");
         $this->db->limit(1);
-		return $this->db->get("employee_to_calculate");
+        $query = $this->db->get("employee_to_calculate");
+        if ($query->num_rows() > 0) {
+            return $query;
+        } else {
+            return false;
+        }
 	}
 
     public function get_report_task()
@@ -17,6 +24,12 @@ class Worker_model extends CI_Model {
         $this->db->limit(1);
 		return $this->db->get("report_list");
 	}
+
+    public function getEmployeeOffice($employeeid){
+    	$q_office = $this->db->query("SELECT description FROM employee a INNER JOIN code_office b ON a.`office` = b.`code` WHERE employeeid = '$employeeid' ");
+    	if($q_office->num_rows() > 0) return $q_office->row()->description;
+    	else return "Not assigned";
+    }
 
     public function displaySched($eid="",$date = ""){
         $wc = "";
@@ -38,7 +51,21 @@ class Worker_model extends CI_Model {
     	else return false;
     }
 
-    public function getEmployeeList($where = "", $orderBy = ""){
+    public function updateReportJobProgress($reportJob, $completed_tasks){
+        $statusChange = "";
+        $isDone = false;
+
+        if($reportJob == $completed_tasks) {
+            $isDone = true;
+            $statusChange = ", status = 'done'";
+        }
+
+        $this->db->query("UPDATE report_list SET completed_tasks = '$completed_tasks' $statusChange WHERE id = '$report_id'");
+
+        return $isDone;
+    }
+
+    public function getEmployeeList($where = "", $worker_id = "", $report_id = ""){
         return $this->db->query("SELECT 
         CONCAT(a.lname, ', ', a.fname , ' ', a.mname) AS fullname,
         a.employeeid, 
@@ -49,12 +76,19 @@ class Worker_model extends CI_Model {
         TRIM(c.`description`) 
         as position_desc, 
         d.description as employement_desc,
-        a.campusid
+        a.campusid,
+        e.id AS rep_breakdown_id
         FROM employee a 
         LEFT JOIN `code_department` b on a.`deptid` = b.`code` 
         LEFT JOIN `code_position` c on a.`positionid` = c.`positionid` 
         LEFT JOIN `code_status` d on a.`employmentstat` = d.`code`
-        WHERE a.employee_uuid <> '' $where ORDER BY fullname ASC")->result();
+        INNER JOIN report_breakdown e ON a.employeeid = e.employeeid
+        WHERE 1 = 1 $where 
+        AND worker_id = '$worker_id'
+        AND e.base_id = '$report_id'
+        AND e.status = 'pending'
+        ORDER BY fullname ASC
+        ")->result();
     }
 
     public function getempteachingtype($user = ""){
@@ -143,12 +177,6 @@ class Worker_model extends CI_Model {
     	else return "Not assigned";
     }
 
-    public function getEmployeeOffice($employeeid){
-    	$q_office = $this->db->query("SELECT description FROM employee a INNER JOIN code_office b ON a.`office` = b.`code` WHERE employeeid = '$employeeid' ");
-    	if($q_office->num_rows() > 0) return $q_office->row()->description;
-    	else return "Not assigned";
-    }
-
     public function getemployeestatus($empstatus=""){
         $returns = "";
         $q = $this->db->query("SELECT code,description FROM code_status WHERE code='$empstatus'")->result();
@@ -158,9 +186,12 @@ class Worker_model extends CI_Model {
         return $returns;
     }
     
-    public function updateReportStatus($report_id, $path, $status="done"){
+    public function updateReportStatus($report_id, $path, $status="done", $completed_tasks=0){
         $this->db->where("id", $report_id);
         $this->db->set("status", $status);
+        if($completed_tasks > 0){
+            $this->db->set("completed_tasks", $completed_tasks);
+        }
         if($status == "done"){
             $this->db->set("path", $path);
             $this->db->set("done_time", $this->getServerTime());
@@ -169,14 +200,14 @@ class Worker_model extends CI_Model {
     }
 
     public function save_report_breakdown($report_list){
-        // $this->db->where("employeeid", $report_list["employeeid"]);
-        // $this->db->where("base_id", $report_list["base_id"]);
-        // $this->db->select("employeeid");
-        // $is_exists = $this->db->get("report_breakdown")->num_rows();
+        $this->db->where("employeeid", $report_list["employeeid"]);
+        $this->db->where("base_id", $report_list["base_id"]);
+        $this->db->select("employeeid");
+        $is_exists = $this->db->get("report_breakdown")->num_rows();
 
-        // if($is_exists === 0){
+        if($is_exists === 0){
             $this->db->insert("report_breakdown", $report_list);
-        // }
+        }
     }
 
     public function fetch_dtr($id){
@@ -226,5 +257,35 @@ class Worker_model extends CI_Model {
             $this->db->delete('report_breakdown'); // Delete records with matching 'base_id'
         }
     }
+
+    public function getReportJob(){
+        $result = $this->db->where("(status = 'pending' OR status = 'ongoing')")
+            ->order_by('timestamp', 'ASC')
+            ->get($this->tables[0])
+            ->row();
+        return $result ? $result : false;
+    }
+
+    public function updateReportBreakdown($report_status, $report_breakdown_id, $report_id) {
+        // Update report_breakdown status
+        $this->db->where("id", $report_breakdown_id)
+                 ->set("status", $report_status)
+                 ->update("report_breakdown");
     
+        // Increment completed_tasks in report_list
+        $this->db->query("UPDATE report_list SET completed_tasks = completed_tasks + 1 WHERE id = '$report_id'");
+    
+        // Update report_list status if completed_tasks = total_tasks
+        $this->db->set("status", "done")
+                 ->set("done_time", $this->getServerTime())
+                 ->where("id", $report_id)
+                 ->where("completed_tasks = total_tasks") // Condition for status update
+                 ->update("report_list");
+    }
+    
+    public function forTrail($data=""){
+        if($data === "") $data = $this->db->last_query();
+        $this->db->insert("for_trail", ["details"=>$data]);
+    }
+
 }

@@ -1,5 +1,4 @@
 <?php
-
     set_time_limit(0);
     ini_set('memory_limit', -1);
     ini_set('max_execution_time', 0);
@@ -55,11 +54,9 @@
 
     // Collect all content and write to the PDF
     $content = ob_get_clean();
-    // echo $content;die;
     $mpdf->WriteHTML($content);
 
     // Save the generated PDF
     $mpdf->Output($path, "F");
-    // $mpdf->Output();die;
 
 ?>

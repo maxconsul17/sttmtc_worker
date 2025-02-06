@@ -78,12 +78,12 @@
 
                         <table style="font-size:11px;width:100%">
                             <tr>
-                            <td><strong>Employee Name: '.$fullname.'</strong></td>
+                            <td><strong>Employee Name: '.$fullname.'</strong></atd>
                             <td><strong>Campus: '.$campus.'</strong></td>
                             </tr>
                             <tr>
                             <td><strong>Employee ID: '.$employeeid.'</strong></td>
-                            <td><strong>Office: '.$department.'</strong></td>
+                            <td><strong>Office: '.$office.'</strong></td>
                             </tr>
                         </table>
 

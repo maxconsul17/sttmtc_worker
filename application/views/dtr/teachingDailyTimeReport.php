@@ -103,29 +103,26 @@
 
                             foreach ($attendance as $date_arr => $att_date) {
                                 $AM_arrival = $AM_departure = $PM_arrival = $PM_departure = $hour = $minute = $remarks = "";
+                            
                                 if($att_date){
                                     $date = $this->time->DayFormatted($date_arr);
                                     $AM_arrival = (isset($att_date[0]) ? $att_date[0]->actlog_time_in : '');
-                                    $AM_departure = (isset($att_date[0]) ?$att_date[0]->actlog_time_out : '');
-
+                                    $AM_departure = (isset($att_date[0]) ? $att_date[0]->actlog_time_out : '');
+    
                                     $lastDataIndexPerDate = count($att_date)-1; //Para makuha yung pinaka last out nya 
-
+    
                                     $PM_arrival = (isset($att_date[$lastDataIndexPerDate]) && count($att_date) > 1 ? $att_date[$lastDataIndexPerDate]->actlog_time_in:'');
                                     $PM_departure = (isset($lastDataIndexPerDate) && count($att_date) > 1 ? $att_date[$lastDataIndexPerDate]->actlog_time_out:'');
-
-                                    $late = $this->time->exp_time($att_date[0]->late);
-                                    $undertime = $this->time->exp_time($att_date[0]->undertime);
-                                    $total_tardy = $late + $undertime;
-                                    $total_tardy = $this->time->sec_to_hm($total_tardy);
-                                    [$hour, $minute] = explode(":", $total_tardy);
-                                    
+    
+                                    list($hour,$minute) = $this->time->totalLateUndertimeDuration($att_date);
+    
                                     $remarks = "";
                                     // $remarks = (isset($att_date[$lastDataIndexPerDate])  ?$this->time->formatTimeOutput($att_date[$lastDataIndexPerDate]->remarks) : '');
                                     if($this->worker_model->displaySched($employeeid, $date_arr)->num_rows() == 0){
                                         // $remarks = "No Shedule";
                                         $remarks = date("l", strtotime($date_arr));
                                     }
-
+    
                                     // if (strpos($remarks, "PENDING") !== false) {
                                     //     $remarks = "";
                                     // }
@@ -141,36 +138,38 @@
                                     // }elseif (strpos($remarks, "SERVICE CREDIT") !== false) {
                                     //     $remarks = "OVERTIME";
                                     // }
-                                    
+    
                                     foreach($att_date as $k => $v){
                                         if($v->holiday){
                                             $remarks = "Holiday";
-                                        }else if (strpos($v->remarks, "UNDERTIME") !== false){
+                                        }else if (strpos($v->remarks, 'UNDERTIME') !== false){
                                             if($v->actlog_time_in == "--" && strtotime($v->actlog_time_out) >= strtotime($v->off_time_out)){
                                                 // $remarks = "";
                                             }
-                                        }else if(strpos($v->remarks, "NO TIME IN") !== false){
+                                        }else if(strpos($v->remarks, 'NO TIME IN') !== false){
                                             if($v->off_time_in != "--" && $v->off_time_out != "--"){
                                                 if($v->actlog_time_in == "--" && $v->actlog_time_out == "--"){
-                                                    // $remarks = "<span style='color:red'>ABSENT</span>"; 
+                                                    // $remarks = '<span style="color:red">ABSENT</span>'; 
                                                 }else if(($v->actlog_time_in == "--" && $v->actlog_time_out != "--") || ($v->actlog_time_in != "--" && $v->actlog_time_out == "--")){
                                                     if($AM_arrival == "" && $PM_departure == ""){
-                                                        // $remarks = "<span style='color:red'>UNDERTIME</span>"; 
+                                                        // $remarks = '<span style="color:red">UNDERTIME</span>'; 
                                                     }else{
                                                         // $remarks = "";
                                                     }
                                                 }
                                             }
-                                        }else if(strpos($v->remarks, "OFFICIAL BUSINESS") !== false){
+                                        }else if(strpos($v->remarks, 'OFFICIAL BUSINESS') !== false){
                                             $AM_arrival = $AM_departure = $PM_arrival = $PM_departure = "";
                                         }
                                     }
-
+                                    
+    
                                     if($this->time->validateDateBetween($actual_dates, $date_arr) === false){
                                         $AM_arrival = $AM_departure = $PM_arrival = $PM_departure = $hour = $minute = $remarks = "";
                                     }
-
+    
                                     $date = $this->time->DayFormatted($date_arr);
+    
                                 }else{
                                     if($this->worker_model->displaySched($employeeid, $date_arr)->num_rows() == 0){
                                         $AM_arrival = $AM_departure = $PM_arrival = $PM_departure = $hour = $minute = "";

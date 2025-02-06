@@ -17,21 +17,12 @@ class Que extends CI_Controller {
 
     // Main entry point for the controller
     public function index(){
-        // $this->db->query("UPDATE report_list SET status = 'qweqwe'");
         // sleep(1); // Delaying execution for 5 seconds (could be for load balancing or delay purpose)
         
-        // Enable query caching for this section
-        $this->db->cache_on();
-
         // Check if there are pending, ongoing or rendering reports
         $has_pending = $this->db->query("SELECT id FROM report_list WHERE status = 'pending' ")->num_rows();
         $print_ongoing = $this->db->query("SELECT id FROM report_list WHERE status = 'ongoing' ")->num_rows();
         $print_rendering = $this->db->query("SELECT id FROM report_list WHERE status = 'rendering' ")->num_rows();
-
-        $has_pending_recompute = $this->db->query("SELECT id FROM recompute_list WHERE status = 'pending' ")->num_rows();
-        $has_ongoing_recompute = $this->db->query("SELECT id FROM recompute_list WHERE status = 'ongoing' ")->num_rows();
-        // Disable query caching after the queries
-        $this->db->cache_off();
         
         // If there are no ongoing or rendering reports, initiate the DTR processing and generation
         if ($print_ongoing == 0 && $print_rendering == 0) {
@@ -42,21 +33,11 @@ class Que extends CI_Controller {
             // Run the calculate
             $this->init_calculate();
         }
-
-        if($has_pending_recompute > 0 && $has_ongoing_recompute == 0){
-            // Run the calculate
-            $this->init_recompute();
-        }
-        
     }
 
     // Task to reprocess attendance logs based on a schedule
     public function init_calculate(){
-        // Enable query caching for this section
-        $this->db->cache_on();
         $emp_list = $this->worker_model->fetch_emp_calculate();  // Fetch list of employees with attendance tasks
-        // Disable query caching after the queries
-        $this->db->cache_off();
         
         // Loop through each employee and reprocess their attendance if applicable
         if ($emp_list->num_rows() > 0) {
@@ -133,15 +114,6 @@ class Que extends CI_Controller {
             "dto" => $dto
         );
 
-        $filter = array(
-            "employeeid" => $employeeid,
-            "dfrom" => $dfrom,
-            "dto" => $dto
-        );
-        $this->db->where($filter)
-         ->set('status', "done")
-         ->update('employee_to_calculate');
-
         // Insert attendance calculation history to the database
         $this->db->insert("att_calc_history", $calc_history);
     }
@@ -160,12 +132,12 @@ class Que extends CI_Controller {
         // Prepare date range
         $data["actual_dates"] = [$det->dfrom, $det->dto];
         $dates = $this->time->generateMonthDates($det->dfrom);
-        // $det->dfrom = $dates["first_date"];
-        // $det->dto = $dates["last_date"];
+        $det->dfrom = $dates["first_date"];
+        $det->dto = $dates["last_date"];
 
         // Fetch employees for the report
         $employeelist = $this->worker_model->getEmployeeList($det->where_clause);
-        if (empty($employeelist) || count($employeelist) == 0) {
+        if (empty($employeelist)) {
             $this->worker_model->updateReportStatus($det->id, "", "No employee to generate");
             return;
         }
@@ -192,9 +164,6 @@ class Que extends CI_Controller {
 				$data['campus'] = $employee->campusid;
 				$data['employeeid'] = $employee->employeeid;
 				$data['attendance'] = $this->worker_model->getEmployeeDTR($employee->employeeid, $det->dfrom, $det->dto, $isteaching);
-                $data['dtrcutoff'] = date('F d, Y', strtotime($det->dfrom)) . ' - ' . date('F d, Y', strtotime($det->dto));
-                // echo "<pre>";print_r($data['attendance']);die;
-                // echo "<pre>";print_r($data);die;
 
 				// Load the appropriate report view
 				$report = $this->load->view(
@@ -213,16 +182,9 @@ class Que extends CI_Controller {
 				$data["report_list"] = [["report" => $report]];
 				$data["path"] = "files/reports/pdf/{$employee->employeeid}_{$det->id}.pdf";
 
-                // ADDITIONAL TRY CATCH FOR ERROR HANDLING
-                try {
-                    // Save the report breakdown and generate the PDF
-                    $this->worker_model->save_report_breakdown($report_data);
-                    $this->load->view('dtr/daily_time_report_pdf', $data);
-                }catch (Exception $e) {
-                    $this->worker_model->updateReportStatus($det->id, "", "error encountered");
-                    continue;
-                }
-
+				// Save the report breakdown and generate the PDF
+				$this->worker_model->save_report_breakdown($report_data);
+				$this->load->view('dtr/daily_time_report_pdf', $data);
 			}catch (Exception $e) {
                 $this->worker_model->updateReportStatus($det->id, "", "error encountered");
 				continue;
@@ -236,112 +198,5 @@ class Que extends CI_Controller {
 	public function process_clean_up($det){
 		$this->worker_model->reset_report_process($det->id);
 	}
-
-    public function init_recompute(){
-        $recomputelist = $this->recompute->get_recompute_task(); // Get pending DTR report tasks
-        
-        if ($recomputelist->num_rows() > 0) {
-            foreach($recomputelist->result() as $recompute){
-                $this->recompute_process($recompute); // Process the DTR report for the first task found
-            }
-        }
-    }
-
-    public function recompute_process($recompute){
-
-        $this->load->model('recompute');
-        $this->recompute->updateRecomputeStatus($recompute->id, "ongoing");
-        // echo '<pre>';print_r($recompute);die;
-        // echo $recompute->formdata;
-
-        // Convert the string back to an associative array
-        $data = [];
-        $pairs = explode(', ', $recompute->formdata); 
-
-        foreach ($pairs as $pair) {
-            list($key, $value) = explode(' => ', $pair); 
-            $data[trim($key)] = trim($value);
-        }
-
-        $deptid     = isset($data['deptid']) ? $data['deptid'] : '';
-		$office     = isset($data['office']) ? $data['office'] : '';
-		$teachingtype     = isset($data['teachingType']) ? $data['teachingType'] : '';
-		$employeeid = isset($data['employeeid']) ? $data['employeeid'] : '';
-		$empstatus = isset($data['empstatus']) ? $data['empstatus'] : '';
-		$schedule   = isset($data['schedule']) ? $data['schedule'] : '';
-		$cutoff     = isset($data['payrollcutoff']) ? $data['payrollcutoff'] : '';
-		$quarter    = isset($data['quarter']) ? $data['quarter'] : '';
-		$campus 	= isset($data['campusid']) ? $data['campusid'] : '';
-		// $company_campus = isset($data['company_campus']) ? $data['company_campus'] : $this->input->post('company_campus');
-		$sortby     = isset($data['sorting']) ? $data['sorting'] : '';
-		$compute_type = isset($data['compute_type']) ? $data['compute_type'] : '';
-
-		$success_count = 0;
-		$arr_data_failed = array();
-
-		$dates = explode(' ',$cutoff);
-		if(isset($dates[0]) && isset($dates[1])){
-			$sdate = $dates[0];
-			$edate = $dates[1];
-			$payroll_cutoff_id = $this->recompute->getPayrollCutoffBaseId($sdate,$edate);
-		}
-
-        $this->load->model('payrollprocess');
-
-		if($compute_type === "main"){
-			$emplist = $this->recompute->loadAllEmpbyDept($deptid,$employeeid,$schedule, $campus,"", $sdate, $edate, $sortby, $office, $teachingtype,$empstatus);
-			$emplist2 = $this->recompute->loadAllEmpbyDeptSample($deptid,$employeeid,$schedule, "", "",  $sdate, $edate, $sortby, $office, $teachingtype,$empstatus);
-
-			if(sizeof($emplist) > 0){
-
-				$data = $this->payrollprocess->processPayrollSummary($emplist,$emplist2,$sdate,$edate,$schedule,$quarter,true,$payroll_cutoff_id);
-				// echo "<pre>"; print_r($data); die;
-				$departments = $this->extras->showdepartment();
-				$data['dept'] 	= isset($departments[$deptid]) ? $departments[$deptid] : "";
-				$data['deptid'] = $deptid;
-				$data['employeeid'] = $employeeid;
-				$data['schedule'] = $schedule;
-				$data['cutoff'] = $cutoff;
-				$data['campus'] = $campus;
-				$data['quarter'] = $quarter;
-				$data['status'] = 'PENDING';
-				$data['issaved'] = '';
-				$data['sortby'] = $sortby;
-
-			}else{
-				echo 'No employees to recompute.';
-				return;
-			}
-			$data['recompute_msg'] = 'Recompute Successful.';
-
-			$data["subtotal"] = $this->hr_reports->payrollSubTotal($data["emplist"]);
-			$data["total"] = $this->hr_reports->payrollGrandTotal($data["emplist"]);
-
-			// echo "<pre>"; print_r($emplist); die;
-			// $this->load->view('payroll/payrolllist',$data);
-		}else{
-			$emplist = $this->payroll->employeeListForSubSite($deptid,$employeeid,$schedule, $campus,"", $sdate, $edate, $sortby, $office, $teachingtype,$empstatus);
-			if(sizeof($emplist) > 0){
-				$data = $this->payrollprocess->processPayrollSub($emplist, $sdate, $edate, $schedule, $quarter, true, $payroll_cutoff_id);
-				$departments = $this->extras->showdepartment();
-				$data['dept'] 	= isset($departments[$deptid]) ? $departments[$deptid] : "";
-				$data['deptid'] = $deptid;
-				$data['employeeid'] = $employeeid;
-				$data['schedule'] = $schedule;
-				$data['cutoff'] = $cutoff;
-				$data['campus'] = $campus;
-				$data['quarter'] = $quarter;
-				$data['sortby'] = $sortby;
-				$data['recompute_msg'] = 'Recompute Successful.';
-				// $this->load->view('payroll/payrolllist_income',$data);
-			}
-            // else{
-			// 	echo 'No employees to recompute.';
-			// 	return;
-			// }
-		}
-        // echo 'done';
-        $this->recompute->updateRecomputeStatus($recompute->id, "done");
-    }
 
 }
