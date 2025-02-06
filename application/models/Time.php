@@ -140,4 +140,16 @@ class Time extends CI_Model {
                 throw new InvalidArgumentException("Invalid time component specified. Use 'hour' or 'minute'.");
         }
     }
+
+   // Transform hours like "1:45" into the total number of minutes, "105". 
+   function hoursToMinutes($hours) 
+   { 
+       $minutes = 0; 
+       if (strpos($hours, ':') !== false) 
+       { 
+           // Split hours and minutes. 
+           list($hours, $minutes) = explode(':', $hours); 
+            return $hours * 60 + $minutes; 
+       } 
+   }
 }

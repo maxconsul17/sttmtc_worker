@@ -3,7 +3,7 @@ defined('BASEPATH') OR exit('No direct script access allowed');
 
 class Worker_model extends CI_Model {
 
-    public $tables = ['report_list'];
+    public $tables = ['report_list','recompute_list'];
 
 	public function fetch_emp_calculate()
 	{           
@@ -262,6 +262,14 @@ class Worker_model extends CI_Model {
         $result = $this->db->where("(status = 'pending' OR status = 'ongoing')")
             ->order_by('timestamp', 'ASC')
             ->get($this->tables[0])
+            ->row();
+        return $result ? $result : false;
+    }
+
+    public function getRecomputeJob(){
+        $result = $this->db->where("(status = 'pending' OR status = 'ongoing')")
+            ->order_by('timestamp', 'ASC')
+            ->get($this->tables[1])
             ->row();
         return $result ? $result : false;
     }

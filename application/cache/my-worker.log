@@ -12665,3 +12665,42 @@ Backtrace:
 2025-02-06 15:56:48 - Queue Worker - Close #4 (PID: 736) | cost: 0.02s
 2025-02-06 15:56:48 - Queue Worker - Close #3 (PID: 734) | cost: 0.02s
 2025-02-06 15:56:48 - Queue Worker - Create #1 (PID: 730)
+2025-02-06 22:57:14 - Queue Listener - Starting listening
+2025-02-06 22:57:14 - Queue Listener - Job detect
+2025-02-06 22:57:14 - Queue Listener - Start dispatch
+2025-02-06 22:57:14 - Queue Listener - Dispatch Worker #1 (PID: 26)
+2025-02-06 22:57:15 - Queue Worker - Create #1 (PID: 26)
+2025-02-06 22:57:15 - Queue Worker - Close #1 (PID: 26) | cost: 0.21s
+2025-02-06 22:57:19 - Queue Listener - Job empty
+2025-02-06 22:57:19 - Queue Listener - Stop dispatch, total cost: 5.01s
+2025-02-06 22:58:28 - Queue Listener - Job detect
+2025-02-06 22:58:28 - Queue Listener - Start dispatch
+2025-02-06 22:58:28 - Queue Listener - Dispatch Worker #1 (PID: 28)
+2025-02-06 22:58:29 - Queue Worker - Create #1 (PID: 28)
+2025-02-06 22:58:29 - Queue Worker - Close #1 (PID: 28) | cost: 0.15s
+2025-02-06 22:58:33 - Queue Listener - Job empty
+2025-02-06 22:58:33 - Queue Listener - Stop dispatch, total cost: 5.07s
+2025-02-06 22:58:39 - Queue Listener - Job detect
+2025-02-06 22:58:39 - Queue Listener - Start dispatch
+2025-02-06 22:58:39 - Queue Listener - Dispatch Worker #1 (PID: 30)
+2025-02-06 22:58:40 - Queue Worker - Create #1 (PID: 30)
+2025-02-06 22:58:40 - Queue Worker - Close #1 (PID: 30) | cost: 0.18s
+2025-02-06 22:58:44 - Queue Listener - Job empty
+2025-02-06 22:58:44 - Queue Listener - Stop dispatch, total cost: 5.03s
+2025-02-06 22:59:05 - Queue Listener - Job detect
+2025-02-06 22:59:05 - Queue Listener - Start dispatch
+2025-02-06 22:59:05 - Queue Listener - Dispatch Worker #1 (PID: 32)
+2025-02-06 22:59:06 - Queue Worker - Create #1 (PID: 32)
+2025-02-06 22:59:07 - Queue Worker - Close #1 (PID: 32) | cost: 0.31s
+2025-02-06 22:59:10 - Queue Listener - Job empty
+2025-02-06 22:59:10 - Queue Listener - Stop dispatch, total cost: 5.06s
+2025-02-06 23:02:08 - Queue Listener - Job detect
+2025-02-06 23:02:08 - Queue Listener - Start dispatch
+2025-02-06 23:02:08 - Queue Listener - Dispatch Worker #1 (PID: 34)
+2025-02-06 23:02:09 - Queue Worker - Create #1 (PID: 34)
+2025-02-06 23:02:09 - Queue Worker - Close #1 (PID: 34) | cost: 0.21s
+2025-02-06 23:02:13 - Queue Listener - Dispatch Worker #2 (PID: 36)
+2025-02-06 23:02:14 - Queue Worker - Create #2 (PID: 36)
+2025-02-06 23:02:14 - Queue Worker - Close #2 (PID: 36) | cost: 0.16s
+2025-02-06 23:02:18 - Queue Listener - Job empty
+2025-02-06 23:02:18 - Queue Listener - Stop dispatch, total cost: 10.06s

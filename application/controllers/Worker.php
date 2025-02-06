@@ -19,14 +19,20 @@ class Worker extends WorkerController
     // Initializer
     protected function init() {
         $this->load->library("ReportManager", null, "report_manager");
+        $this->load->library("RecomputeManager", null, "recompute_manager");
         // $this->load->library("AttendanceManager", null, "attendance_manager");
     }
     
     // Worker
     protected function handleWork($worker_id) {
         $getReportJob = $this->report_manager->getReportJob();
+        $getRecomputeJob = $this->recompute_manager->getRecomputeJob();
         if($getReportJob){
             $this->report_manager->processReport($getReportJob, $worker_id);
+            return false;
+        }
+        if($getRecomputeJob){
+            $this->recompute_manager->processRecompute($getRecomputeJob, $worker_id);
             return false;
         }
 
@@ -38,7 +44,9 @@ class Worker extends WorkerController
     // Listener
     protected function handleListen() {
         $getReportJob = $this->report_manager->getReportJob();
+        $getRecomputeJob = $this->recompute_manager->getRecomputeJob();
         if($getReportJob) return true;
+        if($getRecomputeJob) return true;
 
         return false;
 
