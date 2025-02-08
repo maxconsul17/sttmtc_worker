@@ -105,14 +105,7 @@ class RecomputeManager
 				$data['issaved'] = '';
 				$data['sortby'] = $sortby;
 
-			}else{
-				echo 'No employees to recompute.';
-				return;
 			}
-			$data['recompute_msg'] = 'Recompute Successful.';
-
-			$data["subtotal"] = $this->hr_reports->payrollSubTotal($data["emplist"]);
-			$data["total"] = $this->hr_reports->payrollGrandTotal($data["emplist"]);
 
 			// echo "<pre>"; print_r($emplist); die;
 			// $this->load->view('payroll/payrolllist',$data);
