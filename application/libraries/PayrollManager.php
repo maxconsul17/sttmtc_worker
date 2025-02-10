@@ -100,6 +100,7 @@ class PayrollManager
 
         $emp_data["path"] = "files/payroll/{$job_det->id}.pdf";
         $this->CI->load->view('forms_pdf/payslip_detailed', $emp_data);
+        $this->worker_model->updatePayrollStatus($job_det->id, "done");
     }
 
     public function payrollRegistrarReport($job_det, $worker_id){
