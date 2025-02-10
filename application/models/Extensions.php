@@ -704,7 +704,7 @@ class Extensions extends CI_Model {
 	}
 
 	public function getDTRCutoffConfigPayslip($dfrom, $dto){
-		$cutoff = explode("-", $dtr_cutoff);
+		// $cutoff = explode("-", $dtr_cutoff);
 		$query_date = $this->db->query("SELECT * FROM cutoff a INNER JOIN payroll_cutoff_config b ON a.`id` = b.`baseid` WHERE startdate = '$dfrom' AND enddate = '$dto' ");
 		if($query_date->num_rows() > 0){
 			$cutoffdate = (date('F Y',strtotime($query_date->row()->CutoffFrom)) == date('F Y',strtotime($query_date->row()->CutoffTo))) ? date('F d',strtotime($query_date->row()->CutoffFrom)).' -  '.date('d, Y',strtotime($query_date->row()->CutoffTo)) : date('F d',strtotime($query_date->row()->CutoffFrom)).' -  '.date('F d, Y',strtotime($query_date->row()->CutoffTo));

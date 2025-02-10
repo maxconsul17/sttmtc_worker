@@ -58,7 +58,7 @@ $autoload['packages'] = array();
 |
 |	$autoload['libraries'] = array('user_agent' => 'ua');
 */
-$autoload['libraries'] = array("database", "PdfCreator_mpdf");
+$autoload['libraries'] = array("database", "PdfCreator_mpdf", "Lib_includer");
 
 /*
 | -------------------------------------------------------------------
@@ -132,4 +132,4 @@ $autoload['language'] = array();
 |
 |	$autoload['model'] = array('first_model' => 'first');
 */
-$autoload['model'] = array('worker_model', 'time', 'recompute','attcompute','utils','payroll','employee','attendance','extensions','payrolloptions','extras','hr_reports');
+$autoload['model'] = array('worker_model', 'time', 'recompute','attcompute','utils','payroll','employee','attendance','extensions','payrolloptions','extras','hr_reports','reports');

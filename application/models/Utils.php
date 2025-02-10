@@ -152,7 +152,7 @@ class Utils extends CI_Model {
     }
 
     function hasEditPayrollComputedEditAccess($user=''){
-    	if(!$user) $user = $this->session->userdata('username');
+    	// if(!$user) $user = $this->session->userdata('username');
     	$access_list = array('lara','pinnacle','jvlalonzo');
     	if(in_array($user, $access_list)) return true;
     	else return false;

@@ -2136,16 +2136,16 @@ function delIncome($data){
         if($company && $company != "all")    $whereClause .= " AND b.company_campus='$company'";
 
         $utwc = '';
-        $utdept = $this->session->userdata("department");
-        $utoffice = $this->session->userdata("office");
-        if($this->session->userdata("usertype") == "ADMIN"){
-          if($utdept && $utdept != 'all') $utwc .= " AND  FIND_IN_SET (b.deptid, '$utdept')";
-          if($utoffice && $utoffice != 'all') $utwc .= " AND  FIND_IN_SET (b.office, '$utoffice')";
-          if(($utdept && $utdept != 'all') && ($utoffice && $utoffice != 'all')) $utwc = " AND  (FIND_IN_SET (b.deptid, '$utdept') OR FIND_IN_SET (b.office, '$utoffice'))";
-          if(!$utdept && !$utoffice) $utwc =  " AND b.employeeid = 'nosresult'";
-          $usercampus =  $this->extras->getCampusUser();
-          if($usercampus) $utwc .= " AND FIND_IN_SET (b.campusid,'$usercampus') ";
-        }
+        // $utdept = $this->session->userdata("department");
+        // $utoffice = $this->session->userdata("office");
+        // if($this->session->userdata("usertype") == "ADMIN"){
+        //   if($utdept && $utdept != 'all') $utwc .= " AND  FIND_IN_SET (b.deptid, '$utdept')";
+        //   if($utoffice && $utoffice != 'all') $utwc .= " AND  FIND_IN_SET (b.office, '$utoffice')";
+        //   if(($utdept && $utdept != 'all') && ($utoffice && $utoffice != 'all')) $utwc = " AND  (FIND_IN_SET (b.deptid, '$utdept') OR FIND_IN_SET (b.office, '$utoffice'))";
+        //   if(!$utdept && !$utoffice) $utwc =  " AND b.employeeid = 'nosresult'";
+        //   $usercampus =  $this->extras->getCampusUser();
+        //   if($usercampus) $utwc .= " AND FIND_IN_SET (b.campusid,'$usercampus') ";
+        // }
         $whereClause .= $utwc;
         $query = $this->db->query("SELECT a.*, CONCAT(lname,', ',fname,' ',mname) as fullname,a.$sched as regpay, b.teachingtype, b.employmentstat, b.office
                                      FROM payroll_employee_salary a 
@@ -3028,16 +3028,16 @@ function delIncome($data){
         if($payroll_cutoffstart)          $whereClause .= " AND (dateresigned > '$payroll_cutoffstart' OR b.dateresigned = '1970-01-01' OR dateresigned IS NULL OR dateresigned = '0000-00-00')
                                                 AND a.date_effective <= '$payroll_cutoffstart'";
         $utwc = '';
-        $utdept = $this->session->userdata("department");
-        $utoffice = $this->session->userdata("office");
-        if($this->session->userdata("usertype") == "ADMIN"){
-          if($utdept && $utdept != 'all') $utwc .= " AND  FIND_IN_SET (b.deptid, '$utdept')";
-          if($utoffice && $utoffice != 'all') $utwc .= " AND  FIND_IN_SET (b.office, '$utoffice')";
-          if(($utdept && $utdept != 'all') && ($utoffice && $utoffice != 'all')) $utwc = " AND  (FIND_IN_SET (b.deptid, '$utdept') OR FIND_IN_SET (b.office, '$utoffice'))";
-          if(!$utdept && !$utoffice) $utwc =  " AND b.employeeid = 'nosresult'";
-          $usercampus =  $this->extras->getCampusUser();
-          if($usercampus) $utwc .= " AND FIND_IN_SET (b.campusid,'$usercampus') ";
-        }
+        // $utdept = $this->session->userdata("department");
+        // $utoffice = $this->session->userdata("office");
+        // if($this->session->userdata("usertype") == "ADMIN"){
+        //   if($utdept && $utdept != 'all') $utwc .= " AND  FIND_IN_SET (b.deptid, '$utdept')";
+        //   if($utoffice && $utoffice != 'all') $utwc .= " AND  FIND_IN_SET (b.office, '$utoffice')";
+        //   if(($utdept && $utdept != 'all') && ($utoffice && $utoffice != 'all')) $utwc = " AND  (FIND_IN_SET (b.deptid, '$utdept') OR FIND_IN_SET (b.office, '$utoffice'))";
+        //   if(!$utdept && !$utoffice) $utwc =  " AND b.employeeid = 'nosresult'";
+        //   $usercampus =  $this->extras->getCampusUser();
+        //   if($usercampus) $utwc .= " AND FIND_IN_SET (b.campusid,'$usercampus') ";
+        // }
         $whereClause .= $utwc;
   
         $query = $this->db->query("SELECT c.bank, a.*, CONCAT(lname,', ',fname,' ',mname) as fullname,a.$sched as regpay, b.teachingtype , b.deptid,b.office,b.emp_accno, b.employmentstat

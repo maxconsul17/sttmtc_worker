@@ -152,4 +152,12 @@ class Time extends CI_Model {
             return $hours * 60 + $minutes; 
        } 
    }
+
+   // Transform minutes like "105" into hours like "1:45". 
+   function minutesToHours($minutes) 
+   { 
+       $hours = (int)($minutes / 60); 
+       $minutes -= $hours * 60; 
+       return sprintf("%d:%02.0f", $hours, $minutes); 
+   }   
 }
