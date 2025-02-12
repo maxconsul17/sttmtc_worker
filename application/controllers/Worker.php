@@ -42,7 +42,7 @@ class Worker extends WorkerController
             return false;
         }
 
-        // $this->attendance_manager->processCalculation();
+        $this->attendance_manager->processCalculation();
         
         return false;
     }

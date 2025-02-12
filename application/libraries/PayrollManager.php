@@ -51,7 +51,7 @@ class PayrollManager
         $this->worker_model->updatePayrollStatus($job_det->id, "ongoing");
 
         if ($job_det->code == 'payrollreg' && $job_det->worker_id == $worker_id) $this->payrollRegistrarReport($job_det, $worker_id);
-        if ($job_det->code == 'payslip') $this->paySlip($job_det, $worker_id);
+        if ($job_det->code == 'payslip' && $job_det->worker_id == $worker_id) $this->paySlip($job_det, $worker_id);
 
 
         
