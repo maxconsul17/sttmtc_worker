@@ -21,7 +21,7 @@ class Worker extends WorkerController
         $this->load->library("ReportManager", null, "report_manager");
         $this->load->library("RecomputeManager", null, "recompute_manager");
         $this->load->library("PayrollManager", null, "payroll_manager");
-        // $this->load->library("AttendanceManager", null, "attendance_manager");
+        $this->load->library("AttendanceManager", null, "attendance_manager");
     }
     
     // Worker
