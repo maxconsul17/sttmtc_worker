@@ -31,4 +31,3 @@ RUN echo '#!/bin/bash' > /entrypoint.sh && \
 
 # Set the entrypoint
 ENTRYPOINT ["/entrypoint.sh"]
-
