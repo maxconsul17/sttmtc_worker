@@ -3,7 +3,7 @@ defined('BASEPATH') OR exit('No direct script access allowed');
 
 class Worker_model extends CI_Model {
 
-    public $tables = ['report_list','recompute_list','payroll_list'];
+    public $tables = ['report_list','recompute_list','payroll_list','attendance_list','employee_to_calculate'];
 
 	public function fetch_emp_calculate()
 	{           
@@ -208,6 +208,15 @@ class Worker_model extends CI_Model {
         $this->db->update("payroll_list");
     }
 
+    public function updateAttendanceStatus($payroll_id, $status="done"){
+        $this->db->where("id", $payroll_id);
+        $this->db->set("status", $status);
+        if($status == "done"){
+            $this->db->set("done_time", $this->getServerTime());
+        }
+        $this->db->update("attendance_list");
+    }
+
     public function save_report_breakdown($report_list){
         $this->db->where("employeeid", $report_list["employeeid"]);
         $this->db->where("base_id", $report_list["base_id"]);
@@ -287,6 +296,21 @@ class Worker_model extends CI_Model {
         $result = $this->db->where("(status = 'pending' OR status = 'ongoing')")
             ->order_by('timestamp', 'ASC')
             ->get($this->tables[2])
+            ->row();
+        return $result ? $result : false;
+    }
+
+    public function getAttendanceJob(){
+        $result = $this->db->where("(status = 'pending' OR status = 'ongoing')")
+            ->order_by('timestamp', 'ASC')
+            ->get($this->tables[3])
+            ->row();
+        return $result ? $result : false;
+    }
+
+    public function getCalculateJob(){
+        $result = $this->db->where("(status = 'pending' OR status = 'ongoing')")
+            ->get($this->tables[4])
             ->row();
         return $result ? $result : false;
     }

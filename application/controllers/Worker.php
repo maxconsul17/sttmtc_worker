@@ -26,9 +26,22 @@ class Worker extends WorkerController
     
     // Worker
     protected function handleWork($worker_id) {
+        $getCalculateJob = $this->attendance_manager->getCalculateJob();
         $getReportJob = $this->report_manager->getReportJob();
         $getRecomputeJob = $this->recompute_manager->getRecomputeJob();
         $getPayrollJob = $this->payroll_manager->getPayrollJob();
+        $getAttendanceJob = $this->attendance_manager->getAttendanceJob();
+
+        if($getCalculateJob){
+            $this->attendance_manager->processCalculation();
+            return false;
+        }
+
+        if($getAttendanceJob){
+            $this->attendance_manager->processAttendance($getAttendanceJob, $worker_id);
+            return false;
+        }
+
         if($getReportJob){
             $this->report_manager->processReport($getReportJob, $worker_id);
             return false;
@@ -41,8 +54,6 @@ class Worker extends WorkerController
             $this->payroll_manager->processPayroll($getPayrollJob, $worker_id);
             return false;
         }
-
-        $this->attendance_manager->processCalculation();
         
         return false;
     }
