@@ -82,7 +82,7 @@ class AttendanceManager
             foreach ($emp_list->result_array() as $row) {
                 try{
                     $this->worker_model->update_calculate_status($row, "ongoing");
-
+                    $this->worker_model->update_calculate_status($row, "test");
                     $employeeid = $row["employeeid"];
                     $dfrom = $row["dfrom"];
                     $dto = $row["dto"];
