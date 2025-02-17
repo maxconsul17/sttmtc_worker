@@ -49,7 +49,7 @@ class RecomputeManager
 
     public function recompute_process($recompute, $worker_id){
 
-		if ($recompute->worker_id == $worker_id) return;
+		if ($recompute->worker_id != $worker_id) return;
 
         $this->recompute->updateRecomputeStatus($recompute->id, "ongoing");
         // echo '<pre>';print_r($recompute);die;
