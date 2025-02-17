@@ -56,9 +56,7 @@ class AttendanceManager
     }
 
     public function attendance_process($job_det, $worker_id){
-
-        if ($job_det->code == 'attconf' && $job_det->worker_id == $worker_id) $this->processConfirmAttendance($job_det, $worker_id);
-
+        $this->processConfirmAttendance($job_det, $worker_id);
     }
 
     public function processConfirmAttendance($job_det, $worker_id){
@@ -67,10 +65,11 @@ class AttendanceManager
         $data = json_decode($job_det->formdata,true);
 
         $employeeids = explode(',',$data["empid"]);
-
+		
         foreach ($employeeids as $employeeid) {
             $this->confirmAttendance($data);
         }
+		
         $this->worker_model->updateAttendanceStatus($job_det->id, "done");
     }
 
@@ -151,6 +150,7 @@ class AttendanceManager
         list($dtr_start,$dtr_end,$payroll_start,$payroll_end,$payroll_quarter) = $this->payrolloptions->getDtrPayrollCutoffPair($dfrom,$dto);
         $isnodtr = $this->extensions->checkIfCutoffNoDTR($dfrom,$dto);
         $workhours_arr = array();
+		
         foreach (explode(",", $emp_list) as $employeeid) {
         	$teaching_related = $this->employee->isTeachingRelated($employeeid);
         	if($teaching_type == "teaching" || $teaching_related){
