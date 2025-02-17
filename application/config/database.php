@@ -83,6 +83,16 @@ if (file_exists($file)) {
 	}
 }
 
+$configEndpoint = getenv('CONFIG_BASE_URL');
+
+if($GLOBALS['_SERVER']['DB_NAME'] == 'HRIS_STTHRESE_LA_FIESTA'){
+	$configEndpoint = 'https://lafiesta-sttheresehris.pinnacle.edu.ph/';
+}else if ($GLOBALS['_SERVER']['DB_NAME'] == 'HRIS_STTHRESE_MAGDALO') {
+	$configEndpoint = 'https://magdalo-sttheresehris.pinnacle.edu.ph/';
+} else if ($GLOBALS['_SERVER']['DB_NAME'] == 'HRIS_STTHRESE_TIGBAUAN') {
+	$configEndpoint = 'https://tigbauan-sttheresehris.pinnacle.edu.ph/';
+}
+
 $db['default'] = array(
 	'dsn'	=> '',
 	'hostname' => "192.168.0.47",
@@ -92,6 +102,7 @@ $db['default'] = array(
 	'database_files' =>  getenv('DB_DATABASE_FILE'),
 	'dbdriver' => 'mysqli',
 	'dbprefix' => '',
+	'base_url_config' => $configEndpoint,
 	'db_debug' => (ENVIRONMENT !== 'production'),
 	'cache_on' => TRUE, // Enable query caching
     'cachedir' => APPPATH . 'cache/db_queries/', // Set the cache directory
