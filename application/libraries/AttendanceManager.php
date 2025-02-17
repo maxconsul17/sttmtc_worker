@@ -97,7 +97,7 @@ class AttendanceManager
     // Calculate attendance for a specific employee and date
     public function calculate_attendance($employeeid, $dfrom, $dto){
         // Prepare data for the API request to calculate attendance
-        $curl_uri = $this->CI->db->base_url_config."/index.php/";
+        $curl_uri = $this->CI->db->base_url_config."index.php/";
         $form_data = array(
             "client_secret" => "Y2M1N2E4OGUzZmJhOWUyYmIwY2RjM2UzYmI4ZGFiZjk=",
             "username" => "hyperion",
