@@ -426,7 +426,7 @@ class AttendanceManager
             			tsuspension = '',
             			t_overload = '$teaching_overload_total'");
 
-					echo "<pre>";print_r($this->CI->db->last_query());echo "<pre>";
+					// echo "<pre>";print_r($this->CI->db->last_query());echo "<pre>";
             		if($res) $base_id = $this->CI->db->insert_id();
 
 	                foreach ($workhours_arr as $aimsdept => $classification_arr) {
