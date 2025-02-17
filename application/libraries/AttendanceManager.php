@@ -56,10 +56,13 @@ class AttendanceManager
     }
 
     public function attendance_process($job_det, $worker_id){
-        $this->processConfirmAttendance($job_det, $worker_id);
+		
+        if ($job_det->code == 'attconf' && $job_det->worker_id == $worker_id) $this->processConfirmAttendance($job_det, $worker_id);
+
     }
 
     public function processConfirmAttendance($job_det, $worker_id){
+		
         $this->worker_model->updateAttendanceStatus($job_det->id, "ongoing");
         
         $data = json_decode($job_det->formdata,true);
