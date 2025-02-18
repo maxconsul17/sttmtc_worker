@@ -3,7 +3,7 @@ defined('BASEPATH') OR exit('No direct script access allowed');
 
 class AttendanceManager
 {   
-    private $CI, $worker_model, $time, $recompute, $payrollprocess, $extras, $hr_reports, $payroll, $utils, $extensions, $payrollreport, $payrolloptions, $employee, $employeeAttendance, $attcompute, $attendance;
+    private $CI, $worker_model, $time, $recompute, $payrollprocess, $extras, $hr_reports, $payroll, $utils, $extensions, $payrollreport, $payrolloptions, $employee, $employeeAttendance, $attcompute, $attendance_model;
 
 
     function __construct() 
@@ -40,7 +40,7 @@ class AttendanceManager
         $this->employee = $this->CI->employee;
         $this->employeeAttendance = $this->CI->employeeAttendance;
         $this->attcompute = $this->CI->attcompute;
-        $this->attendance = $this->CI->attendance;
+        $this->attendance_model = $this->CI->attendance;
     }
 
     public function processAttendance($attendanceJob, $worker_id){
@@ -578,8 +578,8 @@ class AttendanceManager
 
 					$this->CI->db->query("DELETE FROM employee_attendance_detailed WHERE employeeid='$employeeid' AND sched_date='$date'");
 
-					$ot_with25 = $this->attendance->loadTotalOTPerDate($employeeid,$date,'total_ot_with_25');
-					$ot_without25 = $this->attendance->loadTotalOTPerDate($employeeid,$date,'total_ot_without_25');
+					$ot_with25 = $this->attendance_model->loadTotalOTPerDate($employeeid,$date,'total_ot_with_25');
+					$ot_without25 = $this->attendance_model->loadTotalOTPerDate($employeeid,$date,'total_ot_without_25');
 
 		            $save_data = array(
 	                    "employeeid" => $employeeid,
@@ -613,8 +613,8 @@ class AttendanceManager
             		$undertime_total = $undertime_total ? $this->attcompute->sec_to_hm($undertime_total) : '';
             		$absent_data_total = $absent_data_total ? $this->attcompute->sec_to_hm($absent_data_total) : '';
 
-					$totalOTWith25Formatted = $this->attendance->loadTotalOT($employeeid,$startdate,$enddate,"total_ot_with_25");
-					$totalOTWithout25Formatted = $this->attendance->loadTotalOT($employeeid,$startdate,$enddate,"total_ot_without_25");
+					$totalOTWith25Formatted = $this->attendance_model->loadTotalOT($employeeid,$startdate,$enddate,"total_ot_with_25");
+					$totalOTWithout25Formatted = $this->attendance_model->loadTotalOT($employeeid,$startdate,$enddate,"total_ot_without_25");
 
 					$res = $this->CI->db->query("INSERT INTO attendance_confirmed_nt SET 
             			employeeid = '$employeeid',
