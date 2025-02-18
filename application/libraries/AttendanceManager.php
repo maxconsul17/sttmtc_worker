@@ -3,7 +3,7 @@ defined('BASEPATH') OR exit('No direct script access allowed');
 
 class AttendanceManager
 {   
-    private $CI, $worker_model, $time, $recompute, $payrollprocess, $extras, $hr_reports, $payroll, $utils, $extensions, $payrollreport, $payrolloptions, $employee, $employeeAttendance, $attcompute;
+    private $CI, $worker_model, $time, $recompute, $payrollprocess, $extras, $hr_reports, $payroll, $utils, $extensions, $payrollreport, $payrolloptions, $employee, $employeeAttendance, $attcompute, $attendance;
 
 
     function __construct() 
@@ -23,6 +23,7 @@ class AttendanceManager
         $this->CI->load->model("Employee", "employee");
         $this->CI->load->model("EmployeeAttendance", "employeeAttendance");
         $this->CI->load->model("Attcompute", "attcompute");
+        $this->CI->load->model("Attendance", "attendance");
         $this->CI->load->database();
 
         $this->worker_model = $this->CI->worker_model;
@@ -39,6 +40,7 @@ class AttendanceManager
         $this->employee = $this->CI->employee;
         $this->employeeAttendance = $this->CI->employeeAttendance;
         $this->attcompute = $this->CI->attcompute;
+        $this->attendance = $this->CI->attendance;
     }
 
     public function processAttendance($attendanceJob, $worker_id){
