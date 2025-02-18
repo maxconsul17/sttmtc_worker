@@ -2856,4 +2856,95 @@ class Attcompute extends CI_Model {
     }
 
 
+    function loadConfOvertime($employeeid = '', $date = "", $base_id="")
+    {
+
+        $result = [];
+        $ot_type = '';
+
+        $excess_limit = 8*60*60;
+        $dayofweek = date('N',strtotime($date));
+        $isWeekend = in_array($dayofweek, array('6','7')) ? true : false;
+
+        $getSched = $this->displaySched($employeeid,$date)->result();
+        $hasSched = count($getSched) > 0 ? true : false;
+
+        if($hasSched) $ot_type = 'WITH_SCHED';
+        if($hasSched && $isWeekend) $ot_type = 'WITH_SCHED_WEEKEND';
+        if(!$hasSched) $ot_type = 'NO_SCHED';
+
+        $query = $this->db->query("SELECT approved_total
+                    FROM
+                    group_overtime AS go
+                    LEFT JOIN overtime_request AS oreq
+                        ON oreq.`aid` = go.`base_id`
+                    WHERE oreq.employeeid = '$employeeid'
+                    AND (
+                            go.`date` = '$date'
+                    )
+                    AND oreq.`status` = 'APPROVED'");
+
+        $query_result =  $query->result();
+
+
+        if(count($query_result) > 0)
+        {
+            // $this->load->model('attendance');
+
+            $otTotalWith25 = $this->attendance->loadTotalOT($employeeid,$date,$date,"total_ot_with_25");
+            $otTotalWithout25 = $this->attendance->loadTotalOT($employeeid,$date,$date,"total_ot_without_25");
+
+            $holidayType = $this->loadHolidayType($employeeid,$date);
+            $excessTime = $this->excessLimit($query_result[0]->approved_total?$query_result[0]->approved_total:"00:00");
+
+            $result['base_id'] = $base_id;
+            $result['ot_hours'] = $query_result[0]->approved_total?$query_result[0]->approved_total:"";
+            $result['ot_type'] = $ot_type;
+            $result['holiday_type'] =  $holidayType ;
+            $result['is_excess'] = $excessTime;
+            $result['total_ot_with_25']=$otTotalWith25;
+            $result['total_ot_without_25']=$otTotalWithout25;
+        }
+        return $result;
+
+    }
+
+    function loadHolidayType($employeeid="",$date="")
+    {
+        $result = "NONE";
+        $query = $this->db->query("SELECT cht.`description`
+                                    FROM code_holiday_calendar AS chc
+                                    LEFT JOIN code_holidays AS ch ON chc.holiday_id = ch.holiday_id
+                                    LEFT JOIN code_holiday_type AS cht ON cht.holiday_type = ch.holiday_type
+                                    WHERE 
+                                        !FIND_IN_SET('$employeeid', ch.prohibited) 
+                                        AND '$date' BETWEEN chc.date_from AND chc.date_to;");
+
+        $query_result = $query->result();
+
+        if($query_result)
+        {
+            if(strpos($query_result[0]->description, 'SPECIAL')!== false) $result = 'SPECIAL';
+            else if(strpos($query_result[0]->description, 'REGULAR')!== false) $result = 'REGULAR';
+        }
+
+        return $result;
+    }
+
+    function excessLimit($ot)
+    {
+        $excess_limit = 8*60*60;
+        $excess = 0;
+        $ottime = $this->exp_time($ot?$ot:"00:00");
+
+        if($ottime > $excess_limit){
+            $excess = $ottime - $excess_limit;
+            $ottime = $excess_limit;
+        }
+
+        return $excess;
+    }
+
+
+
 }

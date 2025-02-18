@@ -576,6 +576,9 @@ class AttendanceManager
 
 					$this->CI->db->query("DELETE FROM employee_attendance_detailed WHERE employeeid='$employeeid' AND sched_date='$date'");
 
+					$ot_with25 = $this->attendance->loadTotalOTPerDate($employeeid,$date,'total_ot_with_25');
+					$ot_without25 = $this->attendance->loadTotalOTPerDate($employeeid,$date,'total_ot_without_25');
+
 		            $save_data = array(
 	                    "employeeid" => $employeeid,
 	                    "sched_date" => $date,
@@ -584,7 +587,9 @@ class AttendanceManager
 	                    "undertime"  =>  ($daily_undertime ? $this->attcompute->sec_to_hm($daily_undertime) : ''),
 	                    "absents"    => ($daily_absents ? $this->attcompute->sec_to_hm($daily_absents) : ''),
 	                    "ot_amount"    => $daily_overtime_amount,
-	                    "ot_type"    => $daily_overtime_mode
+	                    "ot_type"    => $daily_overtime_mode,
+						"total_ot_with_25" => $ot_with25,
+						"total_ot_without_25" => $ot_without25
 	                );
 	                
 	                $this->CI->db->insert("employee_attendance_detailed", $save_data);
@@ -605,6 +610,9 @@ class AttendanceManager
             		$total_suspension = $total_suspension ? $this->attcompute->secondsToDecimalHours($total_suspension) : '';
             		$undertime_total = $undertime_total ? $this->attcompute->sec_to_hm($undertime_total) : '';
             		$absent_data_total = $absent_data_total ? $this->attcompute->sec_to_hm($absent_data_total) : '';
+
+					$totalOTWith25Formatted = $this->attendance->loadTotalOT($employeeid,$startdate,$enddate,"total_ot_with_25");
+					$totalOTWithout25Formatted = $this->attendance->loadTotalOT($employeeid,$startdate,$enddate,"total_ot_without_25");
 
 					$res = $this->CI->db->query("INSERT INTO attendance_confirmed_nt SET 
             			employeeid = '$employeeid',
@@ -634,7 +642,9 @@ class AttendanceManager
             			date_processed = '". date("Y-m-d h:i:s") ."',
             			usertype = '$usertype',
             			scleave = '$service_credit_total',
-            			cto = '$cto_credit_total'");
+            			cto = '$cto_credit_total',
+						total_ot_with_25 = '$totalOTWith25Formatted',
+						total_ot_without_25 = '$totalOTWithout25Formatted'");
 					// echo "<pre>";print_r($this->CI->db->last_query());
             		if($res){
             			$base_id = $this->CI->db->insert_id();
@@ -646,6 +656,8 @@ class AttendanceManager
 		                        $this->CI->db->query("INSERT INTO workhours_perdept_nt (base_id, work_hours, work_days, late_hours, deduc_hours, type, aimsdept) VALUES ('$base_id', '$work_hours', 0,'$late_hours','$deduc_hours','$type','$aimsdept')");
 		                    }
 		                }
+
+						$this->savingConfOThours($startdate,$enddate,$employeeid,$base_id);
 
 		                foreach ($ot_list as $ot_data_tmp){
 		                    $ot_data = $ot_data_tmp;
@@ -664,4 +676,23 @@ class AttendanceManager
     {
         return $this->worker_model->fetch_emp_calculate();
     }
+
+	public function savingConfOThours($startdate="",$enddate="",$employeeId="",$base_id="")
+	{
+		if(($startdate && $enddate && $base_id))
+		{
+			$startDate_ = strtotime($startdate);
+			$endDate_ = strtotime($enddate);
+
+			while ($startDate_ <= $endDate_) {
+				$otConfirmDetails = $this->attcompute->loadConfOvertime($employeeId,date('Y-m-d', $startDate_),$base_id);
+
+				if($otConfirmDetails)
+				{
+					$this->db->insert('attendance_confirmed_nt_ot_hours', $otConfirmDetails);
+				}
+				$startDate_ = strtotime("+1 day", $startDate_);
+			}
+		}
+	}
 }

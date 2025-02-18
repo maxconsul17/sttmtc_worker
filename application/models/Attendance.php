@@ -3072,5 +3072,59 @@ class Attendance extends CI_Model {
     }
 
 
+    public function loadTotalOT($employeeId, $startDate,$endDate,$columnName)
+    {
+        // Query using parameterized values
+        $query = $this->db->query("
+        SELECT SEC_TO_TIME(SUM(TIME_TO_SEC(totalOT))) AS grandTotalOT
+        FROM (
+            SELECT DATE, SEC_TO_TIME(MAX(TIME_TO_SEC($columnName))) AS totalOT
+            FROM employee_attendance_nonteaching
+            WHERE employeeid = ? 
+            AND DATE BETWEEN ? AND ?
+            GROUP BY DATE
+        ) AS filteredOT;
+        ", [$employeeId, $startDate, $endDate]);
+
+        // Fetch the result
+        $result = $query->row();
+
+        // Check if totalOT exists and is not NULL
+        if (!empty($result->grandTotalOT)) {
+        // Remove seconds (HH:MM:SS → HH:MM)
+        $timeParts = explode(":", $result->grandTotalOT);
+        return $timeParts[0] . ":" . $timeParts[1]; // Return HH:MM format
+        }
+
+        // Default value if no record is found
+        return '00:00';
+    }
+
+    
+    public function loadTotalOTPerDate($employeeId,$date,$columnName)
+    {
+        // Use parameterized queries to prevent SQL injection
+        $query = $this->db->query("
+            SELECT {$columnName}
+            FROM employee_attendance_nonteaching
+            WHERE employeeid = ? AND DATE = ? LIMIT 1
+        ", [$employeeId, $date]);
+    
+        // Fetch and return the result as a string
+        $result = $query->row();
+        
+        // Check if the column exists and is not NULL
+        if (!empty($result->$columnName)) {
+            // Remove seconds (HH:MM:SS → HH:MM)
+            $timeParts = explode(":", $result->$columnName);
+            return $timeParts[0] . ":" . $timeParts[1]; // Return HH:MM
+        }
+
+
+        // Return '00:00' if no result is found
+        return '00:00';
+    }
+
+
 }
 // EOF...
