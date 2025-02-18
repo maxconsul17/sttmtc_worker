@@ -58,6 +58,8 @@ class PayrollManager
     }
 
     public function paySlip($job_det, $worker_id){
+
+        try{
         $data = json_decode($job_det->formdata,true);
         // print_r($data);die;
 
@@ -99,7 +101,13 @@ class PayrollManager
         // print_r($emp_data);die;
 
         $emp_data["path"] = "files/payroll/{$job_det->id}.pdf";
+
+        $this->CI->db->query("INSERT INTO payroll_list_trail (id, details) VALUES ('$job_det->id', 'success')");
+        
         $this->CI->load->view('forms_pdf/payslip_detailed', $emp_data);
+        }catch (Exception $e) {
+            $this->CI->db->query("INSERT INTO payroll_list_trail (id, details) VALUES ('$job_det->id', '".$e->getMessage()."')");
+        }
         $this->worker_model->updatePayrollStatus($job_det->id, "done");
     }
 
