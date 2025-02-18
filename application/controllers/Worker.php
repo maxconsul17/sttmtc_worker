@@ -63,6 +63,11 @@ class Worker extends WorkerController
         $getReportJob = $this->report_manager->getReportJob();
         $getRecomputeJob = $this->recompute_manager->getRecomputeJob();
         $getPayrollJob = $this->payroll_manager->getPayrollJob();
+        $getCalculateJob = $this->attendance_manager->getCalculateJob();
+        $getAttendanceJob = $this->attendance_manager->getAttendanceJob();
+
+        if($getCalculateJob) return true;
+        if($getAttendanceJob) return true;
         if($getReportJob) return true;
         if($getRecomputeJob) return true;
         if($getPayrollJob) return true;
