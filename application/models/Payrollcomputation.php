@@ -718,7 +718,13 @@ class Payrollcomputation extends CI_Model {
 				$holiday_type = $row->holiday_type;
 				$is_excess = $row->is_excess;
 
-				$ot_min = $this->time->hoursToMinutes($ot_hours);
+				$ot_with_25 = $this->time->hoursToMinutes($row->total_ot_with_25);
+				$ot_without_25 = $this->time->hoursToMinutes($row->total_ot_without_25);
+
+				// $ot_min = $this->time->hoursToMinutes($ot_hours);
+				// $ot_hour = $ot_min / 60;
+
+				$ot_min = abs($ot_with_25+$ot_without_25);
 				$ot_hour = $ot_min / 60;
 
 				$percent = 100; ///< default
@@ -730,7 +736,16 @@ class Payrollcomputation extends CI_Model {
 				$percent = $percent / 100;
 
 				$hourly_rate = $hourly * $percent;
-				$initial_pay = $hourly_rate * $ot_hour;
+				$minutely_rate = $hourly_rate / 60; 
+
+
+				$initial_pay = ($minutely_rate * $ot_min);
+
+				if($ot_with_25 != 0)
+				{
+					$percent_with = 125 / 100; //default
+					$initial_pay = ($minutely_rate * $ot_min) * $percent_with;
+				}
 
 				$ot_det[$att_baseid] = $initial_pay; ///< insert later for overtime amount details
 
