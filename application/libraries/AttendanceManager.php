@@ -661,12 +661,12 @@ class AttendanceManager
 
 						$this->savingConfOThours($startdate,$enddate,$employeeid,$base_id);
 
-		                foreach ($ot_list as $ot_data_tmp){
-		                    $ot_data = $ot_data_tmp;
-		                    $ot_data["base_id"] = $base_id;
+		                // foreach ($ot_list as $ot_data_tmp){
+		                //     $ot_data = $ot_data_tmp;
+		                //     $ot_data["base_id"] = $base_id;
 
-		                    $this->CI->db->insert('attendance_confirmed_nt_ot_hours', $ot_data);
-		                }
+		                //     $this->CI->db->insert('attendance_confirmed_nt_ot_hours', $ot_data);
+		                // }
             		}
 				}
         	}
@@ -691,7 +691,7 @@ class AttendanceManager
 
 				if($otConfirmDetails)
 				{
-					$this->db->insert('attendance_confirmed_nt_ot_hours', $otConfirmDetails);
+					$this->CI->db->insert('attendance_confirmed_nt_ot_hours', $otConfirmDetails);
 				}
 				$startDate_ = strtotime("+1 day", $startDate_);
 			}
