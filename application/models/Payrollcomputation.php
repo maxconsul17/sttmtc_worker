@@ -739,12 +739,12 @@ class Payrollcomputation extends CI_Model {
 				$minutely_rate = $hourly_rate / 60; 
 
 
-				$initial_pay = ($minutely_rate * $ot_min);
+				$initial_pay = ($ot_min * $minutely_rate);
 
 				if($ot_with_25 != 0)
 				{
 					$percent_with = 125 / 100; //default
-					$initial_pay = ($minutely_rate * $ot_min) * $percent_with;
+					$initial_pay = ($ot_min * $minutely_rate) * $percent_with;
 				}
 
 				$ot_det[$att_baseid] = $initial_pay; ///< insert later for overtime amount details
