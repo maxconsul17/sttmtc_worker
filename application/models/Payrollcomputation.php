@@ -1089,18 +1089,19 @@ class Payrollcomputation extends CI_Model {
 			$wC .= " AND payroll_cutoffstart='$sdate' AND payroll_cutoffend='$edate'";
 		}
 	  
-    	$detail_q = $this->db->query("SELECT id, lateut, ut, absent, day_absent, workdays, isFinal FROM attendance_confirmed_nt WHERE employeeid='$empid' $wC");
+    	$detail_q = $this->db->query("SELECT id, lateut, ut, absent, day_absent, workdays, isFinal, late_deduc FROM attendance_confirmed_nt WHERE employeeid='$empid' $wC");
     	if($detail_q->num_rows() > 0){
     		$base_id 	= $detail_q->row(0)->id;
 
     		$tlec 		= $detail_q->row(0)->lateut;
     		$utlec 		= $detail_q->row(0)->ut;
+			$late_deduc 		= $detail_q->row(0)->late_deduc;
     		$tabsent 	= $detail_q->row(0)->absent;
 
     		$workdays 	= $detail_q->row(0)->workdays;
     		$isFinal 	= $detail_q->row(0)->isFinal;
 
-	        $tardy = $this->attcompute->exp_time($tlec);
+	        $tardy = $this->attcompute->exp_time($late_deduc);
 	        $ut = $this->attcompute->exp_time($utlec);
 	        $absent = $this->attcompute->exp_time($tabsent);
 	        $day_absent 	= $detail_q->row(0)->day_absent;

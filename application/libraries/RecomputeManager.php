@@ -38,8 +38,12 @@ class RecomputeManager
 
     // Initialize processing of Daily Time Record (DTR) reports
     public function processRecompute($recomputeJob, $worker_id){
-
+		try{
         $this->recompute_process($recomputeJob, $worker_id);
+		$this->CI->db->query("INSERT INTO payroll_list_trail (id, details) VALUES ('$recomputeJob->id', 'success')");
+		}catch (Exception $e) {
+			$this->CI->db->query("INSERT INTO payroll_list_trail (id, details) VALUES ('$recomputeJob->id', '".$e->getMessage()."')");
+		}
     }
 
     public function getRecomputeJob()
