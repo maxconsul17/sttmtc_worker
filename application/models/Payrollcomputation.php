@@ -582,7 +582,7 @@ class Payrollcomputation extends CI_Model {
 		$ee = $er = 0;
 		$year = date("Y", strtotime($cutoffstart));
 		if($encoded_ee == NULL){
-			$query = $this->db->query("SELECT emp_ee,emp_er FROM hdmf_deduction WHERE '$gross' BETWEEN compensationfrom AND compensationto AND year <= '$year' ORDER BY year DESC LIMIT 1");
+			$query = $this->db->query("SELECT emp_ee,emp_er,per_ee,per_er FROM hdmf_deduction WHERE '$gross' BETWEEN compensationfrom AND compensationto AND year <= '$year' ORDER BY year DESC LIMIT 1");
 			if ($query->num_rows() > 0) {
 				$emp_ee = $query->row()->emp_ee;
 				$emp_er = $query->row()->emp_er;
