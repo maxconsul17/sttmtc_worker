@@ -457,6 +457,25 @@ class Payrolloptions extends CI_Model {
         return $return;
     }
 
+    //for other income cutoffs
+    public function payrollcutoffPerSched($sched = "", $data = array()){
+        $firstLoad = isset($data["firstLoad"]) ? $data["firstLoad"] : false;
+        $return = "<option value=''>Select Payroll Cut-Off Date</option>";
+        if($sched)  $whereClause = " AND schedule='$sched'";
+        $query = $this->db->query("SELECT CONCAT(startdate,' ',enddate,' ',quarter) as cutoffdate, CONCAT(DATE_FORMAT(startdate,'%M %e, %Y'),' - ',DATE_FORMAT(enddate,'%M %e, %Y')) as cutoffdatedisplay, startdate, enddate FROM payroll_cutoff_config a WHERE 1 $whereClause GROUP BY startdate, enddate ORDER BY startdate DESC")->result();
+        foreach($query as $data){
+            $selected = "";
+            if($firstLoad){
+                $datenow = date("Y-m-d", strtotime($this->extensions->getServerTime()));
+                if (($datenow >= $data->startdate) && ($datenow <= $data->enddate)){
+                    $selected = " selected";
+                }
+            }
+            $return .= "<option value='".$data->cutoffdate."' {$selected} >".$data->cutoffdatedisplay."</option>";
+        }
+        return $return;
+    }
+
     // Payroll cut-off (used in payroll reports on hold employees)
     function displayOnholdCutoff($sched = ""){
         $date_list = '';
@@ -585,6 +604,33 @@ class Payrolloptions extends CI_Model {
         }
         return $return;
     }
+
+    function displaypayrollcutoffdatasub($sched = "",$data = ""){
+        $whereClause = "";
+        $firstLoad = isset($data["firstLoad"]) ? $data["firstLoad"] : false;
+        $eid = isset($data['eid']) ? $data['eid'] : "";
+        $return = "<option value=''>- Select Payroll Cut-Off Date -</option>";
+        $payroll_cutoff_id = isset($data['payroll_cutoff']) ? $data['payroll_cutoff'] : "";
+        if($sched)  $whereClause = " AND schedule='$sched'";
+        if($eid) $whereClause.= " AND employeeid='$eid'";
+
+        $query = $this->db->query("SELECT CONCAT(cutoffstart,' ',cutoffend,' ',quarter) as cutoffdate, CONCAT(DATE_FORMAT(cutoffstart,'%M %e, %Y'),' - ',DATE_FORMAT(cutoffend,'%M %e, %Y')) as cutoffdatedisplay, cutoffstart, cutoffend 
+                                    FROM sub_payroll_computed_table a 
+                                    WHERE a.status = 'PROCESSED'
+                                    $whereClause GROUP BY cutoffstart DESC,cutoffend DESC")->result();
+        foreach($query as $data){
+            $selected = "";
+            if($firstLoad){
+                $datenow = date("Y-m-d", strtotime($this->extensions->getServerTime()));
+                if (($datenow >= $data->cutoffstart) && ($datenow <= $data->cutoffend)){
+                    $selected = " selected";
+                }
+            }
+            $return .= "<option value='".$data->cutoffdate."' ".($payroll_cutoff_id == $data->cutoffdate ? 'selected' : '')." {$selected}>".$data->cutoffdatedisplay."</option>";
+        }
+        return $return;
+    }
+
     // Available Quarters Set from config
     function quarterpayroll($data,$visible = FALSE,$sched = ""){
         $return = "<option value=''>Select Quarter</option>";
@@ -610,7 +656,7 @@ class Payrolloptions extends CI_Model {
                         }break;
                 default :
                         switch($quarter){
-                            case    "1" :  return "Whole Cut-Off";break;
+                            case    "3" :  return "Whole Cut-Off";break;
                         }break;
           }
         }

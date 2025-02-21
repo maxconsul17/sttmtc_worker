@@ -2122,7 +2122,7 @@ function delIncome($data){
     } 
 
       /*employeelist for processed payroll*/
-    function loadAllEmpbyDeptForProcessed($dept = "", $eid = "", $sched = "",$campus="", $sortby="", $company="", $office="", $tnt=""){
+      function loadAllEmpbyDeptForProcessed($dept = "", $eid = "", $sched = "",$campus="", $sortby="", $company="", $office="", $tnt="",$isSubSite=false){
         $whereClause = $orderBy = "";
         if($sortby == "alphabetical") $orderBy = " ORDER BY fullname";
         if($sortby == "department") $orderBy = " ORDER BY c.description";
@@ -2133,26 +2133,47 @@ function delIncome($data){
         }
         if($office)   $whereClause .= " AND b.office='$office'";
         if($eid)    $whereClause .= " AND a.employeeid='$eid'";
-        if($campus && $campus!="All")    $whereClause .= " AND b.campusid='$campus'";
+        if($campus && $campus!="All" && !$isSubSite)    $whereClause .= " AND b.campusid='$campus'";
         if($company && $company != "all")    $whereClause .= " AND b.company_campus='$company'";
 
         $utwc = '';
-        // $utdept = $this->session->userdata("department");
-        // $utoffice = $this->session->userdata("office");
-        // if($this->session->userdata("usertype") == "ADMIN"){
-        //   if($utdept && $utdept != 'all') $utwc .= " AND  FIND_IN_SET (b.deptid, '$utdept')";
-        //   if($utoffice && $utoffice != 'all') $utwc .= " AND  FIND_IN_SET (b.office, '$utoffice')";
-        //   if(($utdept && $utdept != 'all') && ($utoffice && $utoffice != 'all')) $utwc = " AND  (FIND_IN_SET (b.deptid, '$utdept') OR FIND_IN_SET (b.office, '$utoffice'))";
-        //   if(!$utdept && !$utoffice) $utwc =  " AND b.employeeid = 'nosresult'";
-        //   $usercampus =  $this->extras->getCampusUser();
-        //   if($usercampus) $utwc .= " AND FIND_IN_SET (b.campusid,'$usercampus') ";
-        // }
+        $utdept = $this->session->userdata("department");
+        $utoffice = $this->session->userdata("office");
+        if($this->session->userdata("usertype") == "ADMIN"){
+          if($utdept && $utdept != 'all') $utwc .= " AND  FIND_IN_SET (b.deptid, '$utdept')";
+          if($utoffice && $utoffice != 'all') $utwc .= " AND  FIND_IN_SET (b.office, '$utoffice')";
+          if(($utdept && $utdept != 'all') && ($utoffice && $utoffice != 'all')) $utwc = " AND  (FIND_IN_SET (b.deptid, '$utdept') OR FIND_IN_SET (b.office, '$utoffice'))";
+          if(!$utdept && !$utoffice) $utwc =  " AND b.employeeid = 'nosresult'";
+          $usercampus =  $this->extras->getCampusUser();
+        //   if($usercampus)
+        //   {
+        //     if($isSubSite)
+        //     {
+        //         $utwc .= " AND FIND_IN_SET (b.subcampusid,'$usercampus') ";
+        //     }else{
+        //         $utwc .= " AND FIND_IN_SET (b.campusid,'$usercampus') ";
+        //     }
+        //   } 
+        }
         $whereClause .= $utwc;
-        $query = $this->db->query("SELECT a.*, CONCAT(lname,', ',fname,' ',mname) as fullname,a.$sched as regpay, b.teachingtype, b.employmentstat, b.office
-                                     FROM payroll_employee_salary a 
-                                     INNER JOIN employee b ON b.employeeid = a.employeeid
-                                     LEFT JOIN code_office c ON c.code = b.office
-                                     WHERE a.schedule='$sched' $whereClause GROUP BY employeeid $orderBy")->result();
+
+        if($isSubSite)
+        {
+            $query = $this->db->query("SELECT a.*, CONCAT(lname,', ',fname,' ',mname) as fullname,0 as regpay, b.teachingtype, b.employmentstat, b.office
+                FROM employee_income a 
+                INNER JOIN employee b ON b.employeeid = a.employeeid
+                LEFT JOIN code_office d ON d.`code` = b.`office`
+                WHERE a.schedule='$sched' AND NOT EXISTS (SELECT 1 FROM employee_schedule_history sh WHERE sh.employeeid = b.employeeid) $whereClause GROUP BY employeeid")->result();
+        }else{
+            $query = $this->db->query("SELECT a.*, CONCAT(lname,', ',fname,' ',mname) as fullname,a.$sched as regpay, b.teachingtype, b.employmentstat, b.office
+                FROM payroll_employee_salary a 
+                INNER JOIN employee b ON b.employeeid = a.employeeid
+                LEFT JOIN code_office c ON c.code = b.office
+                INNER JOIN employee_schedule_history e ON e.`employeeid` = b.`employeeid`
+                WHERE a.schedule='$sched' $whereClause GROUP BY employeeid $orderBy")->result();
+        }
+
+
         // echo $this->db->last_query();
         // die();
         return $query;
@@ -3378,14 +3399,14 @@ function delIncome($data){
         if($eid) $whereClause .= " AND a.employeeid='$eid'";
         // $whereClause .= " AND FIND_IN_SET('$campus', b.subcampusid) ";
         
-        $query = $this->db->query("SELECT a.*, CONCAT(lname,', ',fname,' ',mname) as fullname,a.$sched as regpay, b.teachingtype, b.employmentstat, b.office
-                                    FROM payroll_employee_salary_history a 
+        $query = $this->db->query("SELECT a.*, CONCAT(lname,', ',fname,' ',mname) as fullname,0 as regpay, b.teachingtype, b.employmentstat, b.office
+                                    FROM employee_income a 
                                     INNER JOIN employee b ON b.employeeid = a.employeeid
                                     LEFT JOIN code_office d ON d.`code` = b.`office`
-                                    WHERE (b.dateresigned2 = '1970-01-01' OR b.dateresigned2 = '0000-00-00' OR b.dateresigned2 IS NULL OR b.dateresigned2 >= '$date' OR b.dateresigned = '1970-01-01' OR b.dateresigned = '0000-00-00' OR b.dateresigned IS NULL OR b.dateresigned >= '$date') AND a.schedule='$sched' AND a.`date_effective` <= '$sdate' AND a.id = (SELECT id FROM payroll_employee_salary_history WHERE date_effective <= '$sdate'  AND employeeid = b.employeeid ORDER BY date_effective DESC LIMIT 1) AND NOT EXISTS (SELECT 1 FROM employee_schedule_history sh WHERE sh.employeeid = b.employeeid) $whereClause GROUP BY employeeid $orderBy ")->result();
+                                    WHERE (b.dateresigned2 = '1970-01-01' OR b.dateresigned2 = '0000-00-00' OR b.dateresigned2 IS NULL OR b.dateresigned2 >= '$date' OR b.dateresigned = '1970-01-01' OR b.dateresigned = '0000-00-00' OR b.dateresigned IS NULL OR b.dateresigned >= '$date') AND a.schedule='$sched' AND a.`datefrom` <= '$sdate' AND NOT EXISTS (SELECT 1 FROM employee_schedule_history sh WHERE sh.employeeid = b.employeeid) $whereClause GROUP BY employeeid $orderBy ")->result();
       
         return $query;
-    }
+    } 
 
 
     // << calculates an employee's holiday pay based on their hourly rate and the hours suspended within a date range.

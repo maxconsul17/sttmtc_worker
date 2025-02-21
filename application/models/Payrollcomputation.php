@@ -870,6 +870,59 @@ class Payrollcomputation extends CI_Model {
 		return $whtax;
 	}
 
+	function computeWithholdingTaxForSub($schedule='',$dependents='',$regpay='',$arr_income,$arr_income_adj,$arr_deduc,$arr_fixeddeduc,$overtime=0,$tardy=0,$absents=0){
+		$whtax = $total_income = $total_deduc = $total_fixeddeduc =  $total_taxable = 0;
+		$this->load->model('payrollprocess');
+
+		///< get total taxable income first
+
+		$income_config_q = $this->payroll->displayIncome();
+		$arr_income_config = $this->payrollprocess->constructArrayListFromStdClass($income_config_q,'id','taxable');
+		$deduction_config_q = $this->payroll->displayDeduction();
+		$arr_deduc_config = $this->payrollprocess->constructArrayListFromStdClass($deduction_config_q,'id','arithmetic');
+
+		if(sizeof($arr_income) > 0){
+			foreach ($arr_income as $key => $value) {
+				if($arr_income_config[$key]['description'] == 'withtax') $total_income += $value;
+			}
+		}
+		if(sizeof($arr_income_adj) > 0){
+			foreach ($arr_income_adj as $key => $value) {
+				if(isset($arr_income_config[$key]['description'])){
+					if($arr_income_config[$key]['description'] == 'withtax') $total_income += $value;
+
+				}else{
+					if($key == 'SALARY') $total_income += $value;
+				}
+			}
+		}
+		if(sizeof($arr_deduc) > 0){
+			foreach ($arr_deduc as $key => $value) {
+				$isDeductionWithtax = $this->payrollprocess->checkDeductionIfWithtax($key);
+				if($isDeductionWithtax == "withtax"){
+					if($arr_deduc_config[$key]['description'] == 'sub') $total_deduc -= $value;
+					else $total_deduc += $value;
+				}
+			}
+		}
+		if(sizeof($arr_fixeddeduc) > 0){
+			foreach ($arr_fixeddeduc as $key => $value) {
+				if($key != 'PERAA') $total_fixeddeduc += $value; ///< fixed deductions are subtracted automatically
+			}
+		}
+		
+		if($schedule == 'monthly'){
+			$total_taxable = $regpay + $total_income - ($total_fixeddeduc * 2);
+
+			$whtax = $this->calculateWithholdingTaxForSub($total_taxable,$schedule,$regpay,$dependents);
+		}else{
+			$total_taxable = $regpay + $total_income - $total_fixeddeduc;
+			$whtax = $this->calculateWithholdingTaxForSub($total_taxable,$schedule,$regpay,$dependents);
+		}
+
+		return $whtax;
+	}
+
 	private function calculateWithholdingTax($total_taxable=0,$schedule='',$regpay=0,$dependents=''){
 		$whtax = 0;
 		$wc = "";
