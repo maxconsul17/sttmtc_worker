@@ -526,13 +526,14 @@ function showStudentSY() {
 
 
     function getCampusUser() {
-        $return = "";
-        $username = $this->session->userdata("username");
-        $query = $this->db->query("SELECT campus FROM user_info where username='$username' ")->result();
-        foreach ($query as $key) {
-            $return = $key->campus;
+        if($GLOBALS['_SERVER']['DB_NAME'] == 'HRIS_STTHRESE_LA_FIESTA'){
+        	$usercampus = 'https://lafiesta-sttheresehris.pinnacle.edu.ph/';
+        }else if ($GLOBALS['_SERVER']['DB_NAME'] == 'HRIS_STTHRESE_MAGDALO') {
+        	$usercampus = 'https://magdalo-sttheresehris.pinnacle.edu.ph/';
+        } else if ($GLOBALS['_SERVER']['DB_NAME'] == 'HRIS_STTHRESE_TIGBAUAN') {
+        	$usercampus = 'https://tigbauan-sttheresehris.pinnacle.edu.ph/';
         }
-        return $return;
+        return $usercampus;
     }
 
     function getCompanyUser() {
