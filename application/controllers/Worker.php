@@ -33,7 +33,7 @@ class Worker extends WorkerController
         $getAttendanceJob = $this->attendance_manager->getAttendanceJob();
 
         if($getCalculateJob){
-            $this->attendance_manager->processCalculation();
+            $this->attendance_manager->processCalculation($getCalculateJob);
             return false;
         }
 

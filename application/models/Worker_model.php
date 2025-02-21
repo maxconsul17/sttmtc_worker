@@ -252,6 +252,9 @@ class Worker_model extends CI_Model {
     public function update_calculate_status($filter, $status="done"){
 		$this->db->where($filter);
 		$this->db->set("status", $status);
+		if($status == 'ongoing'){
+            $this->db->set("try", 'try - 1', FALSE);
+        }
 		$this->db->update("employee_to_calculate");
 	}
 
@@ -309,7 +312,7 @@ class Worker_model extends CI_Model {
     }
 
     public function getCalculateJob(){
-        $result = $this->db->where("(status = 'pending' OR status = 'ongoing')")
+        $result = $this->db->where("(status = 'pending' OR status = 'ongoing') AND try > 0")
             ->get($this->tables[4])
             ->row();
         return $result ? $result : false;

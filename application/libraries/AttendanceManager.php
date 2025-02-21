@@ -78,30 +78,45 @@ class AttendanceManager
         $this->worker_model->updateAttendanceStatus($job_det->id, "done");
     }
 
-    public function processCalculation(){
-        $emp_list = $this->worker_model->fetch_emp_calculate();  // Fetch list of employees with attendance tasks
-        
-        // Loop through each employee and reprocess their attendance if applicable
-        if ($emp_list && $emp_list->num_rows() > 0) {
-            foreach ($emp_list->result_array() as $row) {
-                try{
-                    $this->worker_model->update_calculate_status($row, "ongoing");
+    public function processCalculation($job){
+        // $emp_list = $this->worker_model->fetch_emp_calculate();  // Fetch list of employees with attendance tasks
 
-                    $employeeid = $row["employeeid"];
-                    $dfrom = $row["dfrom"];
-                    $dto = $row["dto"];
-                    $this->calculate_attendance($employeeid, $dfrom, $dto); // Calculate attendance for each employee
-                }catch (Exception $e) {
-                    // SOME ERROR HANDLER HERE
-                }
-            }
-        }
+		try{
+			$row = get_object_vars($job);
+			$this->worker_model->update_calculate_status($row, "ongoing");
+
+			$employeeid = $row["employeeid"];
+			$dfrom = $row["dfrom"];
+			$dto = $row["dto"];
+
+		}catch (Exception $e) {
+			// SOME ERROR HANDLER HERE
+			$this->worker_model->update_calculate_status($row, "failed");
+		}
+		
+        // // Loop through each employee and reprocess their attendance if applicable
+        // if ($emp_list && $emp_list->num_rows() > 0) {
+        //     foreach ($emp_list->result_array() as $row) {
+        //         try{
+					
+        //             $this->worker_model->update_calculate_status($row, "ongoing");
+
+        //             $employeeid = $row["employeeid"];
+        //             $dfrom = $row["dfrom"];
+        //             $dto = $row["dto"];
+
+        //         }catch (Exception $e) {
+        //             // SOME ERROR HANDLER HERE
+		// 			$this->worker_model->update_calculate_status($row, "failed");
+        //         }
+        //     }
+        // }
     }
 
     // Calculate attendance for a specific employee and date
     public function calculate_attendance($employeeid, $dfrom, $dto){
         // Prepare data for the API request to calculate attendance
-        $curl_uri = $this->CI->db->base_url_config."index.php/";
+        $curl_uri = $this->CI->db->base_url_config."index.php/1";
         $form_data = array(
             "client_secret" => "Y2M1N2E4OGUzZmJhOWUyYmIwY2RjM2UzYmI4ZGFiZjk=",
             "username" => "hyperion",
@@ -110,11 +125,11 @@ class AttendanceManager
             "dfrom" => $dfrom,
             "dto" => $dto
         );
-        
+
         // Set up cURL request to external API
         ini_set('display_errors', 1);
         error_reporting(-1);
-
+		
         $curl = curl_init();
         curl_setopt($curl, CURLOPT_URL, $curl_uri . "Api_/calculate_attendance");
         curl_setopt($curl, CURLOPT_RETURNTRANSFER, 1);
@@ -138,6 +153,8 @@ class AttendanceManager
 
         // Insert attendance calculation history to the database
         $this->CI->db->insert("att_calc_history", $calc_history);
+
+		return $httpCode == 200;
     }
 
     public function confirmAttendance($data){
