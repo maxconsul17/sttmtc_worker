@@ -853,7 +853,134 @@ class Payrollprocess extends CI_Model {
         }
 	}
 
+	function getProcessedPayrollSummarySub($emplist=array(), $sdate='',$edate='',$schedule='',$quarter='',$status='PROCESSED',$bank=''){
 
+		
+		//< initialize needed info ---------------------------------------------------
+		$arr_info    = $arr_income_config = $arr_incomeoth_config = $arr_deduc_config = $arr_fixeddeduc_config = $arr_loan_config = array();
+
+		///< ------------------------------ income config ------------------------------------------------------------
+		$income_config_q = $this->payroll->displayIncome();
+		$arr_income_config = $this->constructArrayListFromStdClass($income_config_q,'id','description');
+
+		$arr_income_adj_config = $arr_income_config;
+		$arr_income_adj_config['SALARY'] = array('description'=>'SALARY','hasData'=>0);
+
+		///< ------------------------------ incomeoth config ---------------------------------------------------------------
+		$incomeoth_config_q = $this->payroll->displayIncomeOth();
+		$arr_incomeoth_config = $this->constructArrayListFromStdClass($incomeoth_config_q,'id','description');
+
+		///< ------------------------------ fixed deduction config ----------------------------------------------------
+		$fixeddeduc_config_q = $this->db->query("SELECT code_deduction,description FROM deductions");
+		$arr_fixeddeduc_config = $this->constructArrayListFromStdClass($fixeddeduc_config_q,'code_deduction','description');
+
+
+		///< ------------------------------ deduction config ----------------------------------------------------------
+		$deduction_config_q = $this->payroll->displayDeduction();
+		$arr_deduc_config = $this->constructArrayListFromStdClass($deduction_config_q,'id','description');
+
+
+		///< ------------------------------ loan config ---------------------------------------------------------------
+		$loan_config_q = $this->payroll->displayLoan();
+		$arr_loan_config = $this->constructArrayListFromStdClass($loan_config_q,'id','description');
+
+
+		// echo '<pre>';print_r($emplist);die;
+		foreach ($emplist as $row) {
+			$post_to_athena = 1;
+			$empid = $row->employeeid;
+			
+			///< check for computation
+			$res = $this->getPayrollSummarySub($status,$sdate,$edate,$schedule,$quarter,$empid,false,'',$bank);
+			if($res->num_rows() > 0){
+			// echo "<pre>"; print_r($this->db->last_query());
+			// 	die;
+				$regpay =  $row->regpay;
+				// $dependents = $row->dependents;
+
+				$arr_info[$empid]['income'] = $arr_info[$empid]['income_adj'] = $arr_info[$empid]['deduction'] = $arr_info[$empid]['fixeddeduc'] = $arr_info[$empid]['loan'] = array();
+
+				$arr_info[$empid]['fullname'] 	= isset($row->fullname) ? $row->fullname : '';
+				$arr_info[$empid]['deptid'] 	= isset($row->deptid) ? $row->deptid : '';
+				$arr_info[$empid]['office'] 	= isset($row->office) ? $row->office : '';
+				$res 							= $res->row(0); 
+
+				$arr_info[$empid]['base_id'] 	= $res->id; 
+
+				$arr_info[$empid]['salary'] 	= $res->salary;
+				$arr_info[$empid]['overtime'] 	= $res->overtime;
+				$arr_info[$empid]['tardy'] 		= $res->tardy;
+				$arr_info[$empid]['absents'] 	= $res->absents;
+				$arr_info[$empid]['whtax'] 		= $res->withholdingtax;
+				$arr_info[$empid]['editedby'] 	= $res->editedby;
+				$arr_info[$empid]['netbasicpay'] = $res->netbasicpay;
+				$arr_info[$empid]['grosspay'] 	= $res->gross;
+				$arr_info[$empid]['overload'] 	= isset($res->overload) ? $res->overload : 0;
+				$arr_info[$empid]['netpay'] 	= $res->net;
+				$arr_info[$empid]['isHold'] 	= $res->isHold;
+				$arr_info[$empid]['teaching_pay'] 	= $res->teaching_pay;
+				$arr_info[$empid]['finalized_by'] 	= $res->finalized_by;
+				$arr_info[$empid]['finalized_date'] 	= $res->finalized_date;
+				$arr_info[$empid]['posted_date'] 	= $res->posted_date;
+				$arr_info[$empid]['posted_by'] 	= $res->posted_by;
+				$arr_info[$empid]['acknowledged_date'] 	= $res->acknowledged_date;
+				$arr_info[$empid]['acknowledged_by'] 	= $res->acknowledged_by;
+				$arr_info[$empid]['athena_status'] 	= $res->athena_status;
+
+				//< income
+				$income_arr 				= $this->constructArrayListFromComputedTable($res->income);
+				$arr_info[$empid]['income'] = $income_arr;
+				foreach ($income_arr as $k => $v) {
+					if(!$this->getGLAccount("payroll_income_config", $k)) $post_to_athena = 0;
+					$arr_income_config[$k]['hasData'] = 1;
+				}
+
+				$income_adj_arr 				= $this->constructArrayListFromComputedTable($res->income_adj);
+				$arr_info[$empid]['income_adj'] = $income_adj_arr;
+				foreach ($income_adj_arr as $k => $v) {
+					if(!$this->getGLAccount("payroll_income_config", $k)) $post_to_athena = 0;
+					$arr_income_adj_config[$k]['hasData'] = 1;
+				}
+
+				///< fixed deduc
+		        $fixeddeduc_arr = $this->constructArrayListFromComputedTable($res->fixeddeduc);
+		        $arr_info[$empid]['fixeddeduc'] = $fixeddeduc_arr;
+		        foreach ($fixeddeduc_arr as $k => $v) {
+					if(!$this->getGLAccountReg("deductions", $k)) $post_to_athena = 0;
+					$arr_fixeddeduc_config[$k]['hasData'] = 1;
+				}
+
+		        ///< deduc
+		        $deduc_arr = $this->constructArrayListFromComputedTable($res->otherdeduc);
+		        $arr_info[$empid]['deduction'] = $deduc_arr;
+		        foreach ($deduc_arr as $k => $v) {
+					if(!$this->getGLAccount("payroll_deduction_config", $k)) $post_to_athena = 0;
+					$arr_deduc_config[$k]['hasData'] = 1;
+				}
+
+		        ///< loan
+		        $loan_arr = $this->constructArrayListFromComputedTable($res->loan);
+		        $arr_info[$empid]['loan'] = $loan_arr;
+		        foreach ($loan_arr as $k => $v) {
+					if(!$this->getGLAccount("payroll_loan_config", $k)) $post_to_athena = 0;
+					$arr_loan_config[$k]['hasData'] = 1;
+				}
+			}
+
+		} //end loop emplist
+		
+		$data['emplist'] = $arr_info;
+		$data['income_config'] = $arr_income_config;
+		$data['income_adj_config'] = $arr_income_adj_config;
+		$data['incomeoth_config'] = $arr_incomeoth_config;
+		$data['fixeddeduc_config'] = $arr_fixeddeduc_config;
+		$data['deduction_config'] = $arr_deduc_config;
+		$data['loan_config'] = $arr_loan_config;
+		$data['sdate'] = $sdate;
+		$data['edate'] = $edate;
+
+		return $data;
+	}
 
 	function getProcessedPayrollSummary($emplist=array(), $sdate='',$edate='',$schedule='',$quarter='',$status='PROCESSED',$bank=''){
 		//< initialize needed info ---------------------------------------------------
@@ -1421,7 +1548,7 @@ class Payrollprocess extends CI_Model {
 		$eid = $row->employeeid;
 		$regpay = $row->regpay;
 		$tnt = $row->teachingtype;
-		$dependents = $row->dependents;
+		// $dependents = $row->dependents;
 
 		$str_income = $str_income_adj = "";
 		$totalincome = $totalincome_adj = 0;
@@ -1446,8 +1573,7 @@ class Payrollprocess extends CI_Model {
 
 		///< TAX COMPUTATION
 		$wh_tax = $this->comp->getExistingWithholdingTax($eid, $edate);
-		if($wh_tax!="") $info[$eid]['whtax'] = $wh_tax;
-		else $info[$eid]['whtax']  = $this->comp->computeWithholdingTax($schedule,$dependents,($regpay * 2),$info[$eid]['income'],$info[$eid]['income_adj'],$info[$eid]['deduction'],$info[$eid]['fixeddeduc']);
+		$info[$eid]['whtax']  = $this->comp->computeWithholdingTaxForSub($schedule,'',0,$info[$eid]['income'],$info[$eid]['income_adj'],$info[$eid]['deduction'],$info[$eid]['fixeddeduc']);
 
 
 		//<!--NET PAY-->
@@ -1467,6 +1593,7 @@ class Payrollprocess extends CI_Model {
 		$data_tosave['otherdeduc'] 		= $str_deduc;
 		$data_tosave['loan'] 			= $str_loan;
 		$data_tosave['withholdingtax'] 	= $info[$eid]['whtax'];
+		$data_tosave['net'] 	= $info[$eid]['netpay'];
 		
 		$data_tosave_oth['ee_er'] 		= $ee_er;
 		$info[$eid]['base_id'] = $this->saveIncomeCutoffSummaryDraft($data_tosave,$data_tosave_oth);
