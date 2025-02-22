@@ -52,9 +52,72 @@ class PayrollManager
 
         if ($job_det->code == 'payrollreg' && $job_det->worker_id == $worker_id) $this->payrollRegistrarReport($job_det, $worker_id);
         if ($job_det->code == 'payslip' && $job_det->worker_id == $worker_id) $this->paySlip($job_det, $worker_id);
+        if ($job_det->code == 'atmlist' && $job_det->worker_id == $worker_id) $this->atmPayrollList($job_det, $worker_id);
 
 
         
+    }
+
+    public function atmPayrollList($job_det, $worker_id){
+        $data = array();
+        $formdata = json_decode($job_det->formdata,true);
+        // print_r($formdata);die;
+
+        $deptid     		=  ($formdata['deptid']) ?? '';
+		$employeeid 		=  ($formdata['employeeid']) ?? ''; 
+		$schedule   		=  ($formdata['schedule']) ??'';
+		$cutoff     		=  ($formdata['payrollcutoff']) ?? '';
+		$quarter    		=  ($formdata['quarter']) ?? '';
+		$campus    			=  ($formdata['campus']) ?? '';
+		$company_campus    	=  ($formdata['company_campus']) ?? '';
+		$sortby 			=  ($formdata['sortby']) ?? '';
+		$office 			=  ($formdata['office']) ?? '';
+		$teachingtype 		=  ($formdata['tnt']) ?? '';
+
+		$reportname 		=  ($formdata['reportname']) ?? '';
+		$reportformat 		=  ($formdata['reportformat']) ?? '';
+
+		$dateprocessed 		=  ($formdata['dateprocessed']) ?? '';
+		
+
+		$dates = explode(' ',$cutoff);
+		if(isset($dates[0]) && isset($dates[1])){
+			$sdate = $dates[0];
+			$edate = $dates[1];
+		}else{
+            $this->worker_model->updatePayrollStatus($job_det->id, "Invalid Cufoff");
+			return;
+		}
+        
+        $emp_bank = $formdata['emp_bank'] ?? '';
+        $status =  $formdata['emp_status'] ?? '';
+
+        if(!$status) $status = $formdata['payroll_status'] ?? '';
+
+        $data = $this->payrollprocess->getAtmPayrolllist($emp_bank, $sdate, $status, $sortby,$campus, $company_campus,$deptid,$office,$teachingtype,$employeeid);
+        $data['sdate'] = $sdate;
+        $data['edate'] = $edate;
+        $data['sortby'] = $sortby;
+        $data["emp_bank"] = $emp_bank;
+        $data["dateprocessed"] = $dateprocessed;
+        $data['campus_desc'] = (isset($campus) ? ($campus == "All" || $campus == '' ? "All Campus" : $this->extensions->getCampusDescription($campus)) : '');
+        $data['company_desc'] = (isset($company_campus) ? $this->extensions->getCompanyDescriptionReports($company_campus) : '');
+        $data['emp_type']  = ($teachingtype) ? ucfirst($teachingtype) ." Employees " : "";      
+        
+        $data['campusid'] = $formdata['campusid'] ?? '';
+        $data["mtitle"] = "ATM PAYROLL LIST";                                                     				   // ****
+        // $data["departmentid"] = $this->utils->getDepartmentDesc($this->input->post("department") );                // **** LOLA 11-22-2022
+        $data['cutoff_start'] = $sdate;
+        $data['cutoff_end'] = $edate;
+        // $data['company_campus'] =$this->input->post('company_campus');
+        $data['first_person_name'] = ($formdata['first_person_name']) ?? '';
+        $data['first_person_position'] = ($formdata['first_person_position']) ?? '';
+        $data['second_person_name'] = ($formdata['second_person_name']) ?? '';
+        $data['second_person_position'] = ($formdata['second_person_position']) ?? '';
+        $data["path"] = "files/payroll/{$job_det->id}.pdf";
+
+        // echo "<pre>";print_r($data);die;
+        $this->CI->load->view('forms_pdf/atm_payroll_list',$data);
     }
 
     public function paySlip($job_det, $worker_id){
