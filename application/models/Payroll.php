@@ -2137,24 +2137,24 @@ function delIncome($data){
         if($company && $company != "all")    $whereClause .= " AND b.company_campus='$company'";
 
         $utwc = '';
-        $utdept = $this->session->userdata("department");
-        $utoffice = $this->session->userdata("office");
-        if($this->session->userdata("usertype") == "ADMIN"){
-          if($utdept && $utdept != 'all') $utwc .= " AND  FIND_IN_SET (b.deptid, '$utdept')";
-          if($utoffice && $utoffice != 'all') $utwc .= " AND  FIND_IN_SET (b.office, '$utoffice')";
-          if(($utdept && $utdept != 'all') && ($utoffice && $utoffice != 'all')) $utwc = " AND  (FIND_IN_SET (b.deptid, '$utdept') OR FIND_IN_SET (b.office, '$utoffice'))";
-          if(!$utdept && !$utoffice) $utwc =  " AND b.employeeid = 'nosresult'";
-          $usercampus =  $this->extras->getCampusUser();
-        //   if($usercampus)
-        //   {
-        //     if($isSubSite)
-        //     {
-        //         $utwc .= " AND FIND_IN_SET (b.subcampusid,'$usercampus') ";
-        //     }else{
-        //         $utwc .= " AND FIND_IN_SET (b.campusid,'$usercampus') ";
-        //     }
-        //   } 
-        }
+        // $utdept = $this->session->userdata("department");
+        // $utoffice = $this->session->userdata("office");
+        // if($this->session->userdata("usertype") == "ADMIN"){
+        //   if($utdept && $utdept != 'all') $utwc .= " AND  FIND_IN_SET (b.deptid, '$utdept')";
+        //   if($utoffice && $utoffice != 'all') $utwc .= " AND  FIND_IN_SET (b.office, '$utoffice')";
+        //   if(($utdept && $utdept != 'all') && ($utoffice && $utoffice != 'all')) $utwc = " AND  (FIND_IN_SET (b.deptid, '$utdept') OR FIND_IN_SET (b.office, '$utoffice'))";
+        //   if(!$utdept && !$utoffice) $utwc =  " AND b.employeeid = 'nosresult'";
+        //   $usercampus =  $this->extras->getCampusUser();
+        // //   if($usercampus)
+        // //   {
+        // //     if($isSubSite)
+        // //     {
+        // //         $utwc .= " AND FIND_IN_SET (b.subcampusid,'$usercampus') ";
+        // //     }else{
+        // //         $utwc .= " AND FIND_IN_SET (b.campusid,'$usercampus') ";
+        // //     }
+        // //   } 
+        // }
         $whereClause .= $utwc;
 
         if($isSubSite)
