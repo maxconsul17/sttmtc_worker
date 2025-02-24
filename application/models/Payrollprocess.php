@@ -220,9 +220,7 @@ class Payrollprocess extends CI_Model {
 
 		$attendanceList = $this->hr_reports->getAttConfirmed_summary(
 			$tnt,$cutoffDetails['cutoffFrom'],$cutoffDetails['cutoffTo'],
-			$payrollStart,$eid,$campus,$is_trelated,$office,$deptid,
-			$status,$company_campus,$employmentstat
-		);
+			$payrollStart,$eid,$campus,$office,$deptid);
 
 		$data = [
 			'lechour_wr' => 0,
@@ -366,6 +364,10 @@ class Payrollprocess extends CI_Model {
 			$tardy_amount = $managePayroll['tardy_ut_deduction'];
 			$absent_amount = $managePayroll['absent_deduction'];
 			$info[$eid]['overload'] = $managePayroll['overload_less_absent'];
+
+			// Deduc the absent amount on teaching pay amount and hide the teaching absent
+			$info[$eid]['teaching_pay'] -= $absent_amount;
+			$absent_amount = 0;
 
 
 		}else{
@@ -1267,7 +1269,7 @@ class Payrollprocess extends CI_Model {
 	}
 
 	function getEmployeeSalaryRate($regpay, $daily, $employeeid, $sdate){
-		$p_history = $this->db->query("SELECT * FROM payroll_employee_salary_history WHERE employeeid = '$employeeid' AND date_effective <= '$sdate' ORDER BY date_effective DESC LIMIT 1");
+		$p_history = $this->db->query("SELECT * FROM payroll_employee_salary_history WHERE employeeid = '$employeeid' AND date_effective <= '$sdate' AND status = '1' ORDER BY date_effective DESC LIMIT 1");
 		if($p_history->num_rows() > 0) return array($p_history->row()->semimonthly, $p_history->row()->daily);
 		else return array($regpay, $daily);
 	}

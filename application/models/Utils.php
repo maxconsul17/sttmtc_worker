@@ -1092,7 +1092,7 @@ class Utils extends CI_Model {
 		$result = '';
 	
 		if (!isset($validHours[$taggedHour])) {
-			return $result; // Return empty if an invalid hour type is provided
+			return (float) $result; // Return empty if an invalid hour type is provided
 		}
 	
 		$query = $this->db->query("
@@ -1109,7 +1109,7 @@ class Utils extends CI_Model {
 			$result = $queryResult->{$validHours[$taggedHour]} ?? '';
 		}
 	
-		return $result;
+		return (float) $result;
 	}
 	
 
