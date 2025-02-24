@@ -415,8 +415,16 @@ class Payrollprocess extends CI_Model {
 		///< income adjustment
 		list($arr_income_adj_config,$info[$eid]['income_adj'],$totalincome,$str_income_adj) = $this->comp->computeEmployeeIncomeAdj($eid,$schedule,$quarter,$sdate,$edate,$arr_income_adj_config,$totalincome,$payroll_cutoff_id);
 
+		//holidaypay
+		$holidayPay = 0;
+		$dtrdate = $this->extensions->getDTRCutoffConfigArr($sdate, $edate);
+		$hasHoliday = $this->extras->hasHoliday($dtrdate[0], $dtrdate[1])->result();
+		if ($hasHoliday) {
+			$holidayPay = $this->extras->isIncluded($dtrdate[0], $dtrdate[1], $eid) ? $this->extras->holidayCount($sdate, $edate, $eid) * $this->extras->getDaily($eid) : 0;
+		}
+
 		//<!--GROSS PAY-->
-		$info[$eid]['grosspay'] = ($info[$eid]['salary'] + $info[$eid]['teaching_pay'] + $totalincome + $info[$eid]['overtime'] ) - $absent_amount - $tardy_amount;
+		$info[$eid]['grosspay'] = ($info[$eid]['salary'] + $info[$eid]['teaching_pay'] + $totalincome + $info[$eid]['overtime'] ) + $holidayPay - $absent_amount - $tardy_amount;
 
 		list($prevSalary,$prevGrosspay) = $this->getPrevCutoffSalary(date('Y-m',strtotime($sdate)),$quarter,$eid);
 		$prev_teaching_pay = $this->getPrevCutoffTeachingPay(date('Y-m',strtotime($sdate)),$quarter,$eid);
