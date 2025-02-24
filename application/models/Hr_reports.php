@@ -605,7 +605,7 @@ class Hr_reports extends CI_Model {
 	}
 
 	public function fetch_dtr($id){
-        return $this->db->query("SELECT a.report_title, b.* FROM report_list a INNER JOIN report_breakdown b ON a.id = b.base_id WHERE status IN ('rendering', 'ongoing', 'done') AND b.base_id = '$id' GROUP BY b.employeeid ")->result_array();
+        return $this->db->query("SELECT a.report_title, b.* FROM report_list a INNER JOIN report_breakdown b ON a.id = b.base_id WHERE a.status IN ('rendering', 'ongoing', 'done') AND b.base_id = '$id' GROUP BY b.employeeid ")->result_array();
     }
 
 }
