@@ -936,6 +936,24 @@ class Payrollcomputation extends CI_Model {
 		return $whtax;
 	}
 
+	private function calculateWithholdingTaxForSub($total_taxable=0,$schedule='',$regpay=0,$dependents=''){
+		$whtax = 0;
+		$wc = "";
+		// if($dependents) $wc = " AND status_='$dependents'";
+		$tax_config_q = $this->db->query("SELECT * FROM code_tax WHERE tax_type='$schedule' AND tax_range <= '$total_taxable' $wc ORDER BY tax_range DESC LIMIT 1");
+
+		if($tax_config_q->num_rows() > 0){
+			$tax_config = $tax_config_q->row(0);
+
+			if(is_numeric($regpay) && is_numeric($tax_config->tax_range) && is_numeric($regpay) && is_numeric($tax_config->percent) && is_numeric($tax_config->basic_tax)){
+
+				$whtax = (( $total_taxable - $tax_config->tax_range ) * ($tax_config->percent/100) ) + $tax_config->basic_tax;
+			}
+		}
+
+		return $whtax;
+	}	
+
 	private function calculateWithholdingTax($total_taxable=0,$schedule='',$regpay=0,$dependents=''){
 		$whtax = 0;
 		$wc = "";

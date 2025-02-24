@@ -633,6 +633,8 @@ class AttendanceManager
 					$totalOTWith25Formatted = $this->attendance_model->loadTotalOT($employeeid,$startdate,$enddate,"total_ot_with_25");
 					$totalOTWithout25Formatted = $this->attendance_model->loadTotalOT($employeeid,$startdate,$enddate,"total_ot_without_25");
 
+					$workdays = $workdays - $holiday_total - $suspension_total;
+
 					$res = $this->CI->db->query("INSERT INTO attendance_confirmed_nt SET 
             			employeeid = '$employeeid',
             			cutoffstart = '$dfrom',

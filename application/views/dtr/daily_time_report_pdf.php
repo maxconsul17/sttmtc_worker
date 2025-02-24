@@ -38,7 +38,7 @@
 
     // Start buffering content to minimize memory usage
     ob_start();
-    echo $style;
+    // echo $style;
 
     $reportCount = count($report_list);
 

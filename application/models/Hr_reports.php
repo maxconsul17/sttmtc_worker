@@ -80,16 +80,16 @@ class Hr_reports extends CI_Model {
 	          if($usercampus) $where_clause .= " AND FIND_IN_SET (a.campusid,'$usercampus') ";
 	      }
 	      $utwc = '';
-        $utdept = $this->session->userdata("department");
-        $utoffice = $this->session->userdata("office");
-        if($this->session->userdata("usertype") == "ADMIN"){
-          if($utdept && $utdept != 'all') $utwc .= " AND  FIND_IN_SET (a.deptid, '$utdept')";
-          if($utoffice && $utoffice != 'all') $utwc .= " AND  FIND_IN_SET (a.office, '$utoffice')";
-          if(($utdept && $utdept != 'all') && ($utoffice && $utoffice != 'all')) $utwc = " AND  (FIND_IN_SET (a.deptid, '$utdept') OR FIND_IN_SET (a.office, '$utoffice'))";
-          if(!$utdept && !$utoffice) $utwc =  " AND a.employeeid = 'nosresult'";
-          $usercampus =  $this->extras->getCampusUser();
-          if($usercampus) $utwc .= " AND FIND_IN_SET (a.campusid,'$usercampus') ";
-        }
+        // $utdept = $this->session->userdata("department");
+        // $utoffice = $this->session->userdata("office");
+        // if($this->session->userdata("usertype") == "ADMIN"){
+        //   if($utdept && $utdept != 'all') $utwc .= " AND  FIND_IN_SET (a.deptid, '$utdept')";
+        //   if($utoffice && $utoffice != 'all') $utwc .= " AND  FIND_IN_SET (a.office, '$utoffice')";
+        //   if(($utdept && $utdept != 'all') && ($utoffice && $utoffice != 'all')) $utwc = " AND  (FIND_IN_SET (a.deptid, '$utdept') OR FIND_IN_SET (a.office, '$utoffice'))";
+        //   if(!$utdept && !$utoffice) $utwc =  " AND a.employeeid = 'nosresult'";
+        //   $usercampus =  $this->extras->getCampusUser();
+        //   if($usercampus) $utwc .= " AND FIND_IN_SET (a.campusid,'$usercampus') ";
+        // }
 
 		if($teachingtype){
 			if($teachingtype != "trelated") $utwc .= " AND a.teachingtype = '$teachingtype' ";
@@ -173,16 +173,16 @@ class Hr_reports extends CI_Model {
 	          if($usercampus) $where_clause .= " AND FIND_IN_SET (a.campusid,'$usercampus') ";
 	      }
 	     $utwc = '';
-        $utdept = $this->session->userdata("department");
-        $utoffice = $this->session->userdata("office");
-        if($this->session->userdata("usertype") == "ADMIN"){
-          if($utdept && $utdept != 'all') $utwc .= " AND  FIND_IN_SET (a.deptid, '$utdept')";
-          if($utoffice && $utoffice != 'all') $utwc .= " AND  FIND_IN_SET (a.office, '$utoffice')";
-          if(($utdept && $utdept != 'all') && ($utoffice && $utoffice != 'all')) $utwc = " AND  (FIND_IN_SET (a.deptid, '$utdept') OR FIND_IN_SET (a.office, '$utoffice'))";
-          if(!$utdept && !$utoffice) $utwc =  " AND a.employeeid = 'nosresult'";
-          $usercampus =  $this->extras->getCampusUser();
-          if($usercampus) $utwc .= " AND FIND_IN_SET (a.campusid,'$usercampus') ";
-        }
+        // $utdept = $this->session->userdata("department");
+        // $utoffice = $this->session->userdata("office");
+        // if($this->session->userdata("usertype") == "ADMIN"){
+        //   if($utdept && $utdept != 'all') $utwc .= " AND  FIND_IN_SET (a.deptid, '$utdept')";
+        //   if($utoffice && $utoffice != 'all') $utwc .= " AND  FIND_IN_SET (a.office, '$utoffice')";
+        //   if(($utdept && $utdept != 'all') && ($utoffice && $utoffice != 'all')) $utwc = " AND  (FIND_IN_SET (a.deptid, '$utdept') OR FIND_IN_SET (a.office, '$utoffice'))";
+        //   if(!$utdept && !$utoffice) $utwc =  " AND a.employeeid = 'nosresult'";
+        //   $usercampus =  $this->extras->getCampusUser();
+        //   if($usercampus) $utwc .= " AND FIND_IN_SET (a.campusid,'$usercampus') ";
+        // }
         $where_clause .= $utwc;
 		$att_q = $this->db->query("
 									SELECT c.id AS base_id, a.employeeid as qEmpId,office as qDeptId, CONCAT(lname,', ',fname,' ',mname) AS qFullname, b.description AS qDepartment,DATE(c.`timestamp`) as dateconfirmed, c.*
