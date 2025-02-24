@@ -42,7 +42,7 @@ class Hr_reports extends CI_Model {
 			SELECT c.CutoffFrom, c.CutoffTo 
 			FROM cutoff c
 			LEFT JOIN payroll_cutoff_config pc ON pc.baseid = c.id
-			WHERE pc.id = ?
+			WHERE pc.baseid = ?
 		", [$id]);
 	
 		if ($query->num_rows() > 0) {
