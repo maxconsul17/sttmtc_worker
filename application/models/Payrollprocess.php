@@ -1119,7 +1119,7 @@ class Payrollprocess extends CI_Model {
 	}
 
 
-	function getAtmPayrolllist($emp_bank='', $cutoffstart, $status = 'PROCESSED', $sortby = '', $campus = '', $company = '', $deptid = '', $office = '', $teachingtype = '', $employeeid=''){
+	function getAtmPayrolllist($emp_bank='', $cutoffstart, $status = 'PROCESSED', $sortby = '', $campus = '', $company = '', $deptid = '', $office = '', $teachingtype = '', $employeeid='', $employmentstat = ""){
 		$where_clause = $order_by = $account_no = $bank_id = '';
 		if($employeeid && $employeeid[0] && is_array($employeeid)){
 			$emplist = "'" . implode( "','", $employeeid ) . "'";
@@ -1138,6 +1138,7 @@ class Payrollprocess extends CI_Model {
         }
 		if($deptid) $where_clause .= " AND a.`deptid`='$deptid' ";
 		if($office) $where_clause .= " AND a.`office`='$office' ";
+		if($employmentstat) $where_clause .= " AND a.`employmentstat`='$employmentstat' ";
 		if($emp_bank) $where_clause .= " AND c.`bank`='$emp_bank' ";
 		if($campus && $campus != 'all') $where_clause .= " AND a.`campusid`='$campus' ";
 		if($company && $company != 'all') $where_clause .= ' AND a.`company_campus`="'.$company.'" ';

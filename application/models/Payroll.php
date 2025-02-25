@@ -2122,7 +2122,7 @@ function delIncome($data){
     } 
 
       /*employeelist for processed payroll*/
-      function loadAllEmpbyDeptForProcessed($dept = "", $eid = "", $sched = "",$campus="", $sortby="", $company="", $office="", $tnt="",$isSubSite=false){
+      function loadAllEmpbyDeptForProcessed($dept = "", $eid = "", $sched = "",$campus="", $sortby="", $company="", $office="", $tnt="",$isSubSite=false, $employmentstat = ""){
         $whereClause = $orderBy = "";
         if($sortby == "alphabetical") $orderBy = " ORDER BY fullname";
         if($sortby == "department") $orderBy = " ORDER BY c.description";
@@ -2132,6 +2132,7 @@ function delIncome($data){
             else $whereClause .= " AND b.teachingtype='$tnt'";
         }
         if($office)   $whereClause .= " AND b.office='$office'";
+        if($employmentstat)   $whereClause .= " AND b.employmentstat='$employmentstat'";
         if($eid)    $whereClause .= " AND a.employeeid='$eid'";
         if($campus && $campus!="All" && !$isSubSite)    $whereClause .= " AND b.campusid='$campus'";
         if($company && $company != "all")    $whereClause .= " AND b.company_campus='$company'";
@@ -3024,7 +3025,7 @@ function delIncome($data){
         else return false;
     }
 
-    function loadAllEmpbyDeptForPayslip($dept = "", $eid = "", $sched = "",$sort = "", $payroll_cutoffstart ,$includeResigned=true,$adminside ='', $campus='', $company= '', $bank = ''){
+    function loadAllEmpbyDeptForPayslip($dept = "", $eid = "", $sched = "",$sort = "", $payroll_cutoffstart ,$includeResigned=true,$adminside ='', $campus='', $company= '', $bank = '', $employmentstat = ""){
         $data = array();
         $whereClause = "";
         $old_empid = "";
@@ -3042,6 +3043,7 @@ function delIncome($data){
             }
         }
         if($campus && $campus!="All")   $whereClause .= " AND b.campusid = '$campus'";
+        if($employmentstat && $employmentstat!="All")   $whereClause .= " AND b.employmentstat = '$employmentstat'";
         if($company && $company != 'all')   $whereClause .= ' AND b.company_campus = "'.$company.'"';
         if($bank)   $whereClause .= " AND c.bank = '$bank'";
         else        $orderby .= " ORDER BY b.deptid, fullname, timestamp DESC";

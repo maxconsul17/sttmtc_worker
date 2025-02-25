@@ -73,6 +73,7 @@ class PayrollManager
 		$sortby 			=  ($formdata['sortby']) ?? '';
 		$office 			=  ($formdata['office']) ?? '';
 		$teachingtype 		=  ($formdata['tnt']) ?? '';
+        $employmentstat     =  isset($formdata['employmentstat']) ? $formdata['employmentstat'] : $formdata['employmentstat'];
 
 		$reportname 		=  ($formdata['reportname']) ?? '';
 		$reportformat 		=  ($formdata['reportformat']) ?? '';
@@ -94,7 +95,7 @@ class PayrollManager
 
         if(!$status) $status = $formdata['payroll_status'] ?? '';
 
-        $data = $this->payrollprocess->getAtmPayrolllist($emp_bank, $sdate, $status, $sortby,$campus, $company_campus,$deptid,$office,$teachingtype,$employeeid);
+        $data = $this->payrollprocess->getAtmPayrolllist($emp_bank, $sdate, $status, $sortby,$campus, $company_campus,$deptid,$office,$teachingtype,$employeeid, $employmentstat);
         $data['sdate'] = $sdate;
         $data['edate'] = $edate;
         $data['sortby'] = $sortby;
@@ -127,6 +128,7 @@ class PayrollManager
         // print_r($data);die;
 
 		$data["campus"] = $data["campusid"];
+        $employmentstat = isset($data['employmentstat']) ? $data['employmentstat'] : null
 
 		$data["sort"] = 0;
 		$data['payroll_config'] = $this->extensions->getAllIncomeKeysAndDescription();
@@ -140,7 +142,7 @@ class PayrollManager
 			}
 		}
 		
-		$emplist = $this->payroll->loadAllEmpbyDeptForPayslip($data["dept"],$data["eid"],$data["schedule"],$data["sort"],$data["dfrom"],true,'', $data["campus"], '', $data['bank']);
+		$emplist = $this->payroll->loadAllEmpbyDeptForPayslip($data["dept"],$data["eid"],$data["schedule"],$data["sort"],$data["dfrom"],true,'', $data["campus"], '', $data['bank'], $employmentstat);
 
 		$emp_data = $this->payrollreport->getPayslipSummary($emplist,$data["dfrom"],$data["dto"],$data["schedule"],$data["quarter"],$data["bank"]);
 
@@ -186,6 +188,7 @@ class PayrollManager
 		$company = $post_data["company_campus"];
 		$teachingtype = $post_data["tnt"];
 		$office = $post_data["office"];
+		$employmentstat = isset($post_data["employmentstat"]) ? $post_data["employmentstat"] : "";
 		$bank = $post_data["emp_bank"];
 		$quarter = $post_data["quarter"];
 
@@ -196,7 +199,7 @@ class PayrollManager
 			$edate = $dates[1];
 		}
 
-		$emplist = $this->payroll->loadAllEmpbyDeptForProcessed($deptid, $employeeid, $schedule, $campus, $sortby, $company, $office, $teachingtype);
+		$emplist = $this->payroll->loadAllEmpbyDeptForProcessed($deptid, $employeeid, $schedule, $campus, $sortby, $company, $office, $teachingtype, false, $employmentstat);
 	
 		if (sizeof($emplist) > 0) {
 			$data = $this->payrollprocess->getProcessedPayrollSummary($emplist, $sdate, $edate, $schedule, $quarter, 'PROCESSED', $bank);
