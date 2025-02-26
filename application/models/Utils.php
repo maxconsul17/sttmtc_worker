@@ -1098,7 +1098,7 @@ class Utils extends CI_Model {
 		$query = $this->db->query("
 			SELECT ph.*, tc.* 
 			FROM payroll_emp_salary_perdept_history ph
-			LEFT JOIN tblCourseCategory tc ON tc.id = ph.aimsdept
+			LEFT JOIN tblCourseCategory tc ON tc.Code = ph.aimsdept
 			WHERE ph.employeeid = ? AND tc.DESCRIPTION = ?
 			ORDER BY ph.TIMESTAMP DESC 
 			LIMIT 1
