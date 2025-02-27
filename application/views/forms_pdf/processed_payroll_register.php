@@ -7,6 +7,7 @@
 set_time_limit(0);
 ini_set('memory_limit', -1);
 ini_set('max_execution_time', 0);
+ini_set('display_errors', 0);
 ini_set("pcre.backtrack_limit", "500000000");
 
 $pdf = new \Mpdf\Mpdf([

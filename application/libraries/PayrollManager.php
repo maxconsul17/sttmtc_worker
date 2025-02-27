@@ -73,7 +73,7 @@ class PayrollManager
 		$sortby 			=  ($formdata['sortby']) ?? '';
 		$office 			=  ($formdata['office']) ?? '';
 		$teachingtype 		=  ($formdata['tnt']) ?? '';
-        $employmentstat     =  isset($formdata['employmentstat']) ? $formdata['employmentstat'] : $formdata['employmentstat'];
+        $employmentstat     =  isset($formdata['employmentstat']) ? $formdata['employmentstat'] : '';
 
 		$reportname 		=  ($formdata['reportname']) ?? '';
 		$reportformat 		=  ($formdata['reportformat']) ?? '';
@@ -119,6 +119,7 @@ class PayrollManager
 
         // echo "<pre>";print_r($data);die;
         $this->CI->load->view('forms_pdf/atm_payroll_list',$data);
+        $this->worker_model->updatePayrollStatus($job_det->id, "done");
     }
 
     public function paySlip($job_det, $worker_id){
@@ -128,7 +129,7 @@ class PayrollManager
         // print_r($data);die;
 
 		$data["campus"] = $data["campusid"];
-        $employmentstat = isset($data['employmentstat']) ? $data['employmentstat'] : null
+        $employmentstat = isset($data['employmentstat']) ? $data['employmentstat'] : null;
 
 		$data["sort"] = 0;
 		$data['payroll_config'] = $this->extensions->getAllIncomeKeysAndDescription();
