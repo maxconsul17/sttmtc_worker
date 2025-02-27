@@ -22,6 +22,7 @@ class Worker extends WorkerController
         $this->load->library("RecomputeManager", null, "recompute_manager");
         $this->load->library("PayrollManager", null, "payroll_manager");
         $this->load->library("AttendanceManager", null, "attendance_manager");
+        $this->load->library("FacialManager", null, "facial_manager");
     }
     
     // Worker
@@ -31,6 +32,7 @@ class Worker extends WorkerController
         $getRecomputeJob = $this->recompute_manager->getRecomputeJob();
         $getPayrollJob = $this->payroll_manager->getPayrollJob();
         $getAttendanceJob = $this->attendance_manager->getAttendanceJob();
+        $getFacialJob = $this->facial_manager->getFacialJob();
 
         if($getCalculateJob){
             $this->attendance_manager->processCalculation($getCalculateJob);
@@ -54,6 +56,10 @@ class Worker extends WorkerController
             $this->payroll_manager->processPayroll($getPayrollJob, $worker_id);
             return false;
         }
+        if($getFacialJob){
+            $this->facial_manager->processFacial($getFacialJob, $worker_id);
+            return false;
+        }
         
         return false;
     }
@@ -65,12 +71,14 @@ class Worker extends WorkerController
         $getPayrollJob = $this->payroll_manager->getPayrollJob();
         $getCalculateJob = $this->attendance_manager->getCalculateJob();
         $getAttendanceJob = $this->attendance_manager->getAttendanceJob();
+        $getFacialJob = $this->facial_manager->getFacialJob();
 
         if($getCalculateJob) return true;
         if($getAttendanceJob) return true;
         if($getReportJob) return true;
         if($getRecomputeJob) return true;
         if($getPayrollJob) return true;
+        if($getFacialJob) return true;
 
         return false;
 

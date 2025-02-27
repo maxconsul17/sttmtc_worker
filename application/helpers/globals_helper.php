@@ -812,6 +812,12 @@ class Globals
             "TG" => "https://tigbauan-sttheresehris.pinnacle.edu.ph/index.php/"
         );
 
+        // $db_list = array(
+        //     "LF" => "http://192.168.2.236:9041/index.php/",
+        //     "MD" => "http://192.168.2.236:9042/index.php/",
+        //     "TG" => "http://192.168.2.236:9043/index.php/"
+        // );
+
         if($campus_id){
             return $db_list[$campus_id];
         }else{
