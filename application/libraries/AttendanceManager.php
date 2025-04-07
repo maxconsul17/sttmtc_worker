@@ -88,7 +88,8 @@ class AttendanceManager
 			$employeeid = $row["employeeid"];
 			$dfrom = $row["dfrom"];
 			$dto = $row["dto"];
-
+			$hris_endpoint = $row["endpoint"];
+			$this->calculate_attendance($employeeid, $dfrom, $dto, $hris_endpoint); // Calculate attendance for each employee
 		}catch (Exception $e) {
 			// SOME ERROR HANDLER HERE
 			$this->worker_model->update_calculate_status($row, "failed");
@@ -114,9 +115,9 @@ class AttendanceManager
     }
 
     // Calculate attendance for a specific employee and date
-    public function calculate_attendance($employeeid, $dfrom, $dto){
+    public function calculate_attendance($employeeid, $dfrom, $dto, $hris_endpoint){
         // Prepare data for the API request to calculate attendance
-        $curl_uri = $this->CI->db->base_url_config."index.php/1";
+        $curl_uri = $hris_endpoint."index.php/";
         $form_data = array(
             "client_secret" => "Y2M1N2E4OGUzZmJhOWUyYmIwY2RjM2UzYmI4ZGFiZjk=",
             "username" => "hyperion",
