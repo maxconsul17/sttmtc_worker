@@ -3,7 +3,7 @@ defined('BASEPATH') OR exit('No direct script access allowed');
 
 class AttendanceManager
 {   
-    private $CI, $worker_model, $time, $recompute, $payrollprocess, $extras, $hr_reports, $payroll, $utils, $extensions, $payrollreport, $payrolloptions, $employee, $employeeAttendance, $attcompute, $attendance_model;
+    private $CI, $worker_model, $time, $recompute, $payrollprocess, $extras, $hr_reports, $payroll, $utils, $extensions, $payrollreport, $payrolloptions, $employee, $employeeAttendance, $attcompute, $attendance_model, $api, $timesheet;
 
 
     function __construct() 
@@ -24,6 +24,8 @@ class AttendanceManager
         $this->CI->load->model("EmployeeAttendance", "employeeAttendance");
         $this->CI->load->model("Attcompute", "attcompute");
         $this->CI->load->model("Attendance", "attendance");
+		$this->CI->load->model("Api", "api");
+		$this->CI->load->model("Timesheet", "timesheet");
         $this->CI->load->database();
 
         $this->worker_model = $this->CI->worker_model;
@@ -41,6 +43,8 @@ class AttendanceManager
         $this->employeeAttendance = $this->CI->employeeAttendance;
         $this->attcompute = $this->CI->attcompute;
         $this->attendance_model = $this->CI->attendance;
+		$this->api = $this->CI->api;
+		$this->timesheet = $this->CI->timesheet;
     }
 
     public function processAttendance($attendanceJob, $worker_id){
@@ -88,8 +92,47 @@ class AttendanceManager
 			$employeeid = $row["employeeid"];
 			$dfrom = $row["dfrom"];
 			$dto = $row["dto"];
-			$hris_endpoint = $row["endpoint"];
-			$this->calculate_attendance($employeeid, $dfrom, $dto, $hris_endpoint); // Calculate attendance for each employee
+			// $hris_endpoint = $row["endpoint"];
+			// $this->calculate_attendance($employeeid, $dfrom, $dto, $hris_endpoint); // Calculate attendance for each employee
+
+			if(isset($employeeid) && isset($dfrom) && isset($dto)){
+
+				// Update first employee_attendance_update , tag to 0 to avoid duplication of process
+				$this->api->updateCalculateTagging($employeeid, $dfrom, $dto);
+
+				$date_range = $this->attcompute->displayDateRange($dfrom, $dto);
+				// Globals::pd($date_range);die;
+				foreach($date_range as $date){
+
+					// REPROCESS TIMESHEET BASED ON SCHEDULE
+					$this->timesheet->reprocessFacialLogBySchedule($employeeid, $date->dte);
+
+					$isteaching = $this->employee->getempteachingtype($employeeid);
+					$teaching_related = $this->employee->isTeachingRelated($employeeid);
+					if($isteaching){
+						$this->employeeAttendance->employeeAttendanceTeaching($employeeid, $date->dte);
+					}else{
+						if($teaching_related){
+							$this->employeeAttendance->employeeAttendanceTeaching($employeeid, $date->dte);
+						}else{
+							$this->employeeAttendance->employeeAttendanceNonteaching($employeeid, $date->dte);
+						}
+					}
+				}
+				
+				// UPDATE TASK STATUS
+				$filter = [
+					"employeeid" => $employeeid,
+					"dfrom" => $dfrom,
+					"dto" => $dto
+				];
+				$this->api->update_calculate_status($filter);
+				$response = "done";
+
+				echo $response;die;
+
+			}
+
 		}catch (Exception $e) {
 			// SOME ERROR HANDLER HERE
 			$this->worker_model->update_calculate_status($row, "failed");
