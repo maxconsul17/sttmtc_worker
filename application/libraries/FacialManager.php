@@ -26,9 +26,20 @@ class FacialManager
         if ($facialJob->worker_id == $worker_id) $this->process_facial($facialJob, $worker_id);
     }
 
+    public function processFailedFacial($facialJob, $worker_id){
+
+        if ($facialJob->worker_id == $worker_id){
+            $this->worker_model->retryFacial($facialJob->id);
+        }
+    }
+
     public function getFacialJob()
     {
         return $this->worker_model->getFacialJob();
+    }
+    public function getFailedFacialJob()
+    {
+        return $this->worker_model->getFailedFacialJob();
     }
 
     // Process the DTR report for a given report task

@@ -266,6 +266,12 @@ class Worker_model extends CI_Model {
         }
 		$this->db->update("employee_to_calculate");
 	}
+    public function retryFacial($id, $count="3"){
+		$this->db->where("id", $id);
+		$this->db->set("status", 'pending');
+        $this->db->set("try", $count, FALSE);
+		$this->db->update("facial_log_que");
+	}
 
     public function stuck_report_list(){
         return $this->db->query("SELECT id FROM report_list 
@@ -329,6 +335,14 @@ class Worker_model extends CI_Model {
 
     public function getFacialJob(){
         $result = $this->db->where("(status = 'pending' OR status = 'ongoing') AND try > 0")
+            ->get($this->tables[5])
+            ->row();
+        return $result ? $result : false;
+    }
+
+    public function getFailedFacialJob(){
+        $three_days_ago = date('Y-m-d H:i:s', strtotime('-1 days'));
+        $result = $this->db->where("(status != 'done') AND try = 0 AND timestamp <= '$three_days_ago'")
             ->get($this->tables[5])
             ->row();
         return $result ? $result : false;
