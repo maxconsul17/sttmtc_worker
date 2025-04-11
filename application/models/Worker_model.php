@@ -220,6 +220,9 @@ class Worker_model extends CI_Model {
     public function updateFacialStatus($id, $status="done"){
         $this->db->where("id", $id);
         $this->db->set("status", $status);
+        if($status == 'ongoing'){
+            $this->db->set("try", 'try - 1', FALSE);
+        }
         if($status == "done"){
             $this->db->set("done_time", $this->getServerTime());
         }

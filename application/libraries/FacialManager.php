@@ -76,12 +76,12 @@ class FacialManager
 
                 if($err === ""){
                     $trail = array(
-                        "details" => json_encode($det->body),
+                        "details" => $det->body,
                         "status" => "success"
                     );
                 }else{
                     $trail = array(
-                        "details" => json_encode($det->body),
+                        "details" => $det->body,
                         "status" => "has curl error"
                     );
                 }
