@@ -5,7 +5,9 @@ class EmployeeAttendance extends CI_Model {
     public function employeeAttendanceTeaching($employeeid, $date){
         $this->load->model("ob_application");
         $this->load->model('Attcompute'); 
+        $this->removeExistingAttendance($employeeid, $date);
         $deptid = $this->employee->getindividualdept($employeeid);
+        $teachingtype = "teaching";
         $classification_arr = $this->extensions->getFacultyLoadsClassfication();
         $classification_list = array();
         foreach ($classification_arr as $key => $value) {
@@ -121,8 +123,6 @@ class EmployeeAttendance extends CI_Model {
                 $time2 = new DateTime($etime);
                 // $classification = isset($classification_list[$rsched->classification]) ? $classification_list[$rsched->classification] : '';
                 // $isOverload = ($classification == 'overload');
-
-
                 if($type == "LEC"){
                     $to_time = strtotime($stime);
                     $from_time = strtotime($etime);
@@ -257,7 +257,14 @@ class EmployeeAttendance extends CI_Model {
                         $login = $ob_details['timefrom'];
                         $logout = $ob_details['timeto'];
                     }
-                } else if($ol == "DA" && $obtypes==1 && $ob_id){
+                }else if($ol == "DA" && $obtypes==2 && $ob_id && $is_ob == $ob_id){
+                    $ob_details = $this->ob_application->getLeaveDetails($ob_id);
+                    
+                    if($ob_details['timefrom'] && $ob_details['timeto']){
+                        $login = $ob_details['timefrom'];
+                        $logout = $ob_details['timeto'];
+                    }
+                }else if($ol == "DA" && $obtypes==1 && $ob_id){
                     $ob_details = $this->ob_application->getLeaveDetails($ob_id);
                     if($ob_details['sched_affected']){
                         list($login, $logout) = explode('|', $ob_details['sched_affected']);
@@ -290,6 +297,20 @@ class EmployeeAttendance extends CI_Model {
 
                 // Absent
                 $initial_absent = $absent = $this->attcompute->displayAbsent($stime,$etime,$login,$logout,$employeeid,$date,$earlydismissal, $absent_start);
+
+                $vl_approved = $this->attcompute->approvedLeaveApplication($employeeid, $date);
+                if ($vl_approved || $oltype == 'OFFICIAL BUSINESS') {
+                    if ($vl_approved[0]->nodays == 0.50) {
+                        list($start_time, $end_time) = explode('|', $vl_approved[0]->sched_affected);
+                        if($start_time == $stime ){
+                            $login = $stime;
+                            $logout = $etime;
+                        }
+                    }else {
+                        $login = $stime;
+                        $logout = $etime;
+                    }
+                }
 
 
                 // additional absent condition;
@@ -384,7 +405,7 @@ class EmployeeAttendance extends CI_Model {
 
                 // GET CURRENT LOG TIME BY SCHEDULE
                 if(!$login ){
-                    $login = $this->timesheet->currentLogtimeAMSchedule($employeeid, $date, $stime, $earlydismissal, $used_time);
+                    $login = $this->timesheet->currentLogtimeAMSchedule($employeeid, $date, $stime, $absent_start, $used_time);
                     if(in_array($login, $used_time)){
                         $login = "";
                     }
@@ -684,8 +705,6 @@ class EmployeeAttendance extends CI_Model {
                 $actlog_time_in = ($login && !$absent ? date("h:i A",strtotime($login)) : "--");
                 $actlog_time_out = ($logout && !$absent ? date("h:i A",strtotime($logout)) : "--");
 
-
-               
                 $terminal = $this->extensions->getTerminalName($campus_tap);
 
                 $twr_lec = $rendered_lec ? $rendered_lec : "";
@@ -785,20 +804,20 @@ class EmployeeAttendance extends CI_Model {
                    
                     $other_leave = $this->attcompute->otherApprovedLeave($employeeid, $date);
                     if ($other_leave) { 
-                        if ($other_leave->type == "BL") {
+                        if ($other_leave->subtype == "BL") {
                             $rwcount = 2;
                             $other = 1; 
-                        } else if ($other_leave->type == "EL") {
+                        } else if ($other_leave->subtype == "EL") {
                             $rwcount = 2;
                             $el = 1; 
-                        }else if($other_leave->type == "SL"){
+                        }else if($other_leave->subtype == "SL"){
                             $rwcount = 2;
                             $sl = 1; 
-                        }else if($other_leave->type == "VL"){
+                        }else if($other_leave->subtype == "VL"){
                             $rwcount = 2;
                             $vl = 1; 
                             $other = "";
-                        }else if($other_leave->type == "OS"){
+                        }else if($other_leave->subtype == "OS"){
                             $rwcount = 2;
                             $other = 1; 
                         }
@@ -973,12 +992,7 @@ class EmployeeAttendance extends CI_Model {
                     $twr_lec = $twr_lab = $twr_admin = $twr_overload = "";
                     $absent_lec = $absent_lab = $absent_admin = $absent_overload = "";
                 }
-                // if vl approved and whole day
-                $vl_approved = $this->attcompute->vlWholeDayApproved($employeeid, $date);
-                if ($vl_approved || $oltype == 'OFFICIAL BUSINESS') {
-                    $actlog_time_in = date("h:i A",strtotime($off_time_in));
-                    $actlog_time_out = date("h:i A",strtotime($off_time_out));
-                }
+       
                 $holiday_type = (isset($holidayInfo['holiday_code']) && $holiday) ?$holidayInfo['holiday_code'] : "";
 
                 
@@ -1317,6 +1331,7 @@ class EmployeeAttendance extends CI_Model {
         $this->load->model("ob_application");
         $this->load->model("payrollcomputation");
         $this->load->model('Attcompute'); 
+        $this->removeExistingAttendance($employeeid, $date, false);
         $deptid = $this->employee->getindividualdept($employeeid);
         $fixedday = $this->attcompute->isFixedDay($employeeid);
         $classification_arr = $this->extensions->getFacultyLoadsClassfication();
@@ -1427,6 +1442,7 @@ class EmployeeAttendance extends CI_Model {
             $sched_min = $this->time->minutesToHours($sched_min);
             $sched_sec = round(abs(strtotime($sched_row->endtime) - strtotime($sched_row->starttime)),2);
 
+            $previous_login = $previous_logout = "";
 
             foreach($schedule_result_data as $sched_key => $rsched){
                 $workdays = 0;
@@ -1462,7 +1478,6 @@ class EmployeeAttendance extends CI_Model {
 
 
                     list($otreg,$otrest,$othol) = $this->attcompute->displayOt($employeeid,$date,true, $holiday);
-                    // echo "<pre>"; print_r(array($otreg,$otrest,$othol)); die;
                     if($otreg || $otrest || $othol){
                         $ot_remarks = "OVERTIME APPLICATION";
                     }
@@ -1506,7 +1521,13 @@ class EmployeeAttendance extends CI_Model {
                             $login = $ob_details['timefrom'];
                             $logout = $ob_details['timeto'];
                         }
-                    } else if($ol == "DA" && $obtypes==1 && $ob_id){
+                    }else if($ol == "DA" && $obtypes==2 && $ob_id && $ob_id == $is_ob){
+                        $ob_details = $this->ob_application->getLeaveDetails($ob_id);
+                        if($ob_details['timefrom'] && $ob_details['timeto']){
+                            $login = $ob_details['timefrom'];
+                            $logout = $ob_details['timeto'];
+                        }
+                    }else if($ol == "DA" && $obtypes==1 && $ob_id){
                         $ob_details = $this->ob_application->getLeaveDetails($ob_id);
                         if($ob_details['sched_affected']){
                             list($login, $logout) = explode('|', $ob_details['sched_affected']);
@@ -1545,6 +1566,21 @@ class EmployeeAttendance extends CI_Model {
                         $logout = $etime;
                     }
 
+                                    
+                $vl_approved = $this->attcompute->approvedLeaveApplication($employeeid, $date);
+                if($vl_approved){
+                    if ($vl_approved[0]->nodays == 0.50) {
+                        list($start_time, $end_time) = explode('|', $vl_approved[0]->sched_affected);
+                        if($start_time == $stime ){
+                            $login = $stime;
+                            $logout = $etime;
+                        }
+                    }else{
+                        $login = $stime;
+                        $logout = $etime;
+                    }
+                }
+
 
                 // Use Service Credit
                 $use_sc_remarks = "";
@@ -1578,7 +1614,6 @@ class EmployeeAttendance extends CI_Model {
                 }
 
                     
-
                      // Absent
                     $absent = $this->attcompute->displayAbsent($stime,$etime,$login,$logout,$employeeid,$date,$earlyd);
 
@@ -1642,31 +1677,76 @@ class EmployeeAttendance extends CI_Model {
                         $tempabsent = $absent;
                     }
 
-                     // GET CURRENT LOG TIME BY SCHEDULE
-                     if(!$login ){
-                        $login = $this->timesheet->currentLogtimeAMSchedule($employeeid, $date, $stime, $earlyd, $used_time_no_used);
-                        if(in_array($login, $used_time_no_used)){
-                            $login = "";
+                    // GET CURRENT LOG TIME BY SCHEDULE (LOGIN)
+                    if (!$login) {
+                        $login = $this->timesheet->currentLogtimeAMSchedule($employeeid, $date, $stime, $absent_start, $used_time_no_used);
+
+                        // NEW: Remove logout if it’s within a short interval (e.g., 5 minute) of login
+                        $min_diff = 5; // minutes
+                        if ($login && $last_login) {
+                            $login_time = strtotime($login);
+                            $last_login_time = strtotime($last_login);
+                            $diff = abs($last_login_time - $login_time) / 60; // difference in minutes
+ 
+                            if ($diff <= $min_diff) {
+                                $login = "";
+                            }
                         }
 
-                        if($last_login == $login || $last_logout == $login){
-                            $login = "";
+                        // If first schedule and still no login, mark as absent
+                        if ($sched_key == 0 && $login == "") {
+                            $schedstart = strtotime($stime);
+                            $schedend   = strtotime($etime);
+                            $totalMinutes = round(abs($schedend - $schedstart) / 60, 2);
+                            $absent = date('H:i', mktime(0, $totalMinutes));
                         }
                     }
 
-                    // GET CURRENT LOG TIME BY SCHEDULE
-                    if(!$logout ){
-                        $logout = $this->timesheet->currentLogtimePMSchedule($employeeid, $date, $etime, $earlyd, $used_time_no_used, $prior_sched_start, $prior_absent_start);
-                        if(in_array($logout, $used_time_no_used)){
+                    // GET CURRENT LOG TIME BY SCHEDULE (LOGOUT)
+                    if (!$logout) {
+                        $logout = $this->timesheet->currentLogtimePMSchedule(
+                            $employeeid, $date, $etime, $earlyd, $used_time_no_used, $prior_sched_start, $prior_absent_start
+                        );
+
+                        if($last_logout || $last_login || $previous_logout){
+                            if(($last_logout == $logout || $last_login == $logout) || (!$previous_logout && !$login)){
+                                $logout = "";
+                            }
+                        }
+
+                        // Use previous logout if no login found
+                        if (!$login) {
+                            $login = $previous_logout;
+                        }
+
+                        // If logout exists, clear absence
+                        if ($logout) {
+                            // $absent = ""; REMOVE AS PER MAM MARICRIS
+                        }
+
+                        // Prevent identical login/logout if they are both true
+                        if ($login && $logout && $login === $logout) {
                             $logout = "";
                         }
 
-                        if($last_logout == $logout || $last_login == $logout){
-                            $logout = "";
+                        // NEW: Remove logout if it’s within a short interval (e.g., 1 minute) of login
+                        $min_diff = 5; // minutes
+                        if ($login && $logout) {
+                            $login_time = strtotime($login);
+                            $logout_time = strtotime($logout);
+                            $diff = abs($logout_time - $login_time) / 60; // difference in minutes
+
+                            if ($diff <= $min_diff) {
+                                $logout = "";
+                            }
                         }
                     }
 
-                    if($absent){
+
+                    $previous_login = $login;
+                    $previous_logout = $logout;
+                    
+                    if($absent && $log_remarks != "is-absent"){
                         if(!$login && !$logout && !$haslog_forremarks){
                             if($last_login && $last_logout){
                                 $log_remarks = '<span style="color:red">UNDERTIME</span>';
@@ -1678,7 +1758,7 @@ class EmployeeAttendance extends CI_Model {
                         }elseif(!$logout){
                             $log_remarks = 'NO TIME OUT';
                         }
-                    }
+                    }  
 
                     $hasOL = $ol ? ($ol != 'CORRECTION' ? true : false) : false; 
                     if(!$fixedday){
@@ -1751,29 +1831,27 @@ class EmployeeAttendance extends CI_Model {
                     }else if($absent){
                         if(in_array("absent", $ob_data)) $log_remarks = "EXCUSED ABSENT";
                         else{
-                            // if(strtotime($date) < strtotime($date_tmp)){
-                                // $log_remarks = "ABSENT";
-                                $ob_type = false;
-                                if(!$login && !$logout && !$haslog_forremarks){
-                                    if($last_login && $last_logout){
-                                        $log_remarks = '<span style="color:red">UNDERTIME</span>';
-                                    }else{
-                                        $log_remarks = '<span style="color:red">NO TIME IN AND OUT</span>';
-                                    }
-                                }elseif(!$login) {
-                                    $log_remarks = "<span style='color:red'>LATE</span>";
-                                }elseif(!$logout) {
-                                    $log_remarks = 'NO TIME OUT';
-                                    // $tworkhours = "0:00";
-                                    // }
+                            $ob_type = false; 
+                            if(!$login && !$logout && !$haslog_forremarks){
+                                if($last_login && $last_logout){
+                                    $log_remarks = '<span style="color:red">UNDERTIME</span>';
+                                }else{
+                                    $log_remarks = '<span style="color:red">NO TIME IN AND OUT</span>';
                                 }
+                            }elseif(!$login) {
+                                $log_remarks = "<span style='color:red'>LATE</span>";
+                            }
                         }
                     }
                     
                     // For bypassing remarks, displaying missing logs
-                    // if ($login xor $logout) {
-                    //     $log_remarks = '<span style="color:red">MISSING LOGS</span>';
-                    // }
+                    if ($login xor $logout) {
+                        if (!$login) {
+                            $log_remarks = '<span style="color:red">NO TIME IN</span>';
+                        } elseif (!$logout) {
+                            $log_remarks = '<span style="color:red">NO TIME OUT</span>';
+                        }
+                    }
                     
                     if(!$login){
                         $login = $this->timesheet->getNooutData($employeeid, $date);
@@ -1839,7 +1917,7 @@ class EmployeeAttendance extends CI_Model {
                         $oltype = $obType == 'SEMINAR' ? $obType : $oltype;
                     }
                   
-                    $other = ($ol && !in_array($ol, $not_included_ol) && $oltype)  ? 1 : ""; 
+                    $other = ($ol && !in_array($ol, $not_included_ol) && $oltype)  ? $ol : ""; 
                     $rwcount = 1;
                     if(!$dispLogDate) $rwcount = 1;
                     if($haswholedayleave || $pending || $holiday) $rwcount = $countrow;
@@ -1855,36 +1933,42 @@ class EmployeeAttendance extends CI_Model {
                     }
 
                     $ot_app =  $this->attcompute->displayOTApp($employeeid, $date);
+                    $hasOThours=  $this->attcompute->hasOvertimeHours($employeeid, $date);
                     if ($ot_app) {
                         if ($ot_app->status == "APPROVED") {
-                            $ot_regular = $ot_app->grand_total;
+                            // $ot_regular = $ot_app->grand_total;
                         } else {
-                            $pending_ot_remarks = "PENDING OVERTIME APPLICATION";
+                            if($hasOThours)
+                            {
+                                $pending_ot_remarks = "PENDING OVERTIME APPLICATION";
+                            }
                         }
                     }
 
                     // leave apllication
+                    $leave_count = isset($leave_data[3]) ? $leave_data[3] : 0;
                     $leave_app_status = $this->attcompute->otherApprovedLeave($employeeid, $date);
                     if ($leave_app_status) { 
-                        if ($leave_app_status->type == "BL") {
+                        if ($leave_app_status->subtype == "BL") {
                             $rwcount = 2;
-                            $other = 1; 
+                            $other = $leave_count; 
                             $log_remarks = 'BIRTHDAY LEAVE<br>';
-                        } else if ($leave_app_status->type == "EL") {
+                        } else if ($leave_app_status->subtype == "EL") {
                             $rwcount = 2;
-                            $el = 1; 
+                            $el = $leave_count; 
                             $log_remarks = 'EMERGENCY LEAVE<br>';
-                        } else if ($leave_app_status->type == "VL") {
+                        } else if ($leave_app_status->subtype == "VL") {
                             $rwcount = 2;
-                            $vl = 1; 
+                            $vl = $leave_count; 
                             $other = "";
-                        }else if($leave_app_status->type == "SL"){
+                        }else if($leave_app_status->subtype == "SL"){
                             $rwcount = 2;
-                            $sl = 1; 
-                            $log_remarks = 'SICK LEAVE<br>';
-                        }else if($leave_app_status->type == "OS"){
+                            $sl = $leave_count; 
+                            $other = "";
+                            // $log_remarks = 'SICK LEAVE<br>';
+                        }else if($leave_app_status->subtype == "OS"){
                             $rwcount = 2;
-                            $other = 1;
+                            $other = $leave_count;
                             $log_remarks = 'OFF SET<br>';
                         }
                     }
@@ -1911,21 +1995,19 @@ class EmployeeAttendance extends CI_Model {
                     $holiday_data = (isset($holidayInfo['holiday_type']) && !empty($holiday)) ? $holidayInfo['holiday_type'] : '';
                     $holiday_type = (isset($holidayInfo['type']) && !empty($holiday)) ? $holidayInfo['type'] : '';
                     
-                    // if vl approved and whole day
-                    $vl_approved = $this->attcompute->vlWholeDayApproved($employeeid, $date);
-                    if ($vl_approved) {
-                        $actlog_time_in = $off_time_in;
-                        $actlog_time_out = $off_time_out;
-                    }
 
+                   
+               
                     // deduct total workhours rendered if has late
                     
-                    $twr = $off_time_total;
                     if($late || $undertime){
+                        $official_time_span = $this->time->getSecondsBetween($off_time_in,$off_time_out);
+                        $twr = $official_time_span;
                         $lateut = $this->attcompute->exp_time($late) + $this->attcompute->exp_time($undertime);
-                        $twr_sec = abs($this->attcompute->exp_time($twr) - $lateut);
+                        $twr_sec = abs($twr - $lateut);
                         $twr = $this->attcompute->sec_to_hm($twr_sec);
-                        
+                    }else{
+                        $twr = $off_time_total;
                     }
 
                     // // echo "<pre>";print_r($twr);die;
@@ -1998,7 +2080,7 @@ class EmployeeAttendance extends CI_Model {
                         }
                     }
 
-                    if($actlog_time_in == '--' && $actlog_time_out == '--')
+                    if($actlog_time_in == '--' || $actlog_time_out == '--')
                     {
                         $twr = "0:00";
                     }
@@ -2015,6 +2097,21 @@ class EmployeeAttendance extends CI_Model {
                         $lateDeduction = $this->calculateLateDeduction($late,[$ot_regular,$ot_restday,$ot_holiday]);
                     }
 
+
+                    //Para makuha yung late naunang ma add sa db at maisama sa total overtime
+                    $logs_late = $this->attendance->loadLates($employeeid, $date, "employee_attendance_nonteaching");
+                    $logsLateMinute = $this->attcompute->convertToMinutes($logs_late);
+                    $lateMinute = $this->attcompute->convertToMinutes($late);
+
+                    $totalLate = abs($logsLateMinute + $lateMinute);
+
+                    $totalLateFormatted = $this->attcompute->convertToTimeFormat($totalLate);
+
+                    //Total overtime with && without 25% 
+                     $totalOTWith25 = $this->attcompute->calculateOTWith25($totalLateFormatted,$ot_regular,$ot_restday,$ot_holiday);
+                     $totalOTWithout25 = "";
+                    //  $totalOTWithout25 = $this->attcompute->calculateOTWithout25($totalLateFormatted,$ot_regular,$ot_restday,$ot_holiday);
+                   
                     $this->db->query("INSERT INTO employee_attendance_nonteaching
                     SET employeeid = '$employeeid',
                         `date` = '$date',
@@ -2047,8 +2144,14 @@ class EmployeeAttendance extends CI_Model {
                         rowcount = '$rwcount',
                         holiday_type = '$holiday_type',
                         rate = '$rate',
-                        late_deduc = '$lateDeduction'
+                        late_deduc = '$lateDeduction',
+                        total_ot_with_25 = '$totalOTWith25',
+                        total_ot_without_25 = '$totalOTWithout25'
                         ");
+
+                    //Update all same total with and without 25% 
+                    $this->attendance->updateTotalOT($totalOTWith25,$employeeid,$date,'total_ot_with_25');
+                    $this->attendance->updateTotalOT($totalOTWithout25,$employeeid,$date,'total_ot_without_25');
 
 
                     // VALIDATE WORKHOURS RENDERED IF HAS LATE OR UT ON 2ND SCHEDULE
@@ -2145,6 +2248,7 @@ class EmployeeAttendance extends CI_Model {
                     $off_time_total = $this->attcompute->sec_to_hm($perday_absent);
                     $actlog_time_in = $login?date("h:i A",strtotime($login)):"--";
                     $actlog_time_out = $logout?date("h:i A",strtotime($logout)):"--";
+                    
                     $terminal = $this->extensions->getTerminalName($campus_tap);
                     $twr = $tworkhours;
                     $ot_regular = $otreg?$otreg:"--";
@@ -2203,6 +2307,16 @@ class EmployeeAttendance extends CI_Model {
 
                 $log = $this->attcompute->displayLogTimeFlexi($employeeid,$date,$edata);
                 $off_time_in = $off_time_out = $off_time_total = $actlog_time_in = $actlog_time_out = $terminal = $twr = $ot_regular = $ot_restday = $ot_holiday = $late = $undertime = $vl_deduc_late = $vl_deduc_undertime = $absent_data = $service_credit = $cto_credit = $remarks = $vacation = $sick = $other = $holiday_data = "--";
+
+                $login = $this->timesheet->noSchedLog($employeeid, $date, "ORDER BY logtime ASC");
+                if($login !== false){
+                    $actlog_time_in = date("h:i A", strtotime($login));
+                }
+
+                $logout = $this->timesheet->noSchedLog($employeeid, $date, "ORDER BY logtime DESC");
+                if($logout !== false && $login != $logout){
+                    $actlog_time_out = date("h:i A", strtotime($logout));
+                }
 
                 $off_time_total = $this->attcompute->sec_to_hm($perday_absent);
                 $terminal = $this->extensions->getTerminalName($campus_tap);
@@ -2738,6 +2852,14 @@ class EmployeeAttendance extends CI_Model {
             LEFT JOIN `code_status` d on a.`employmentstat` = d.`code`
             WHERE 1 = 1 $where
             ORDER BY fullname ASC")->num_rows();
+    }
+
+    public function removeExistingAttendance($employeeid, $date, $teaching = true){
+        if($teaching){
+            $this->db->query("DELETE FROM employee_attendance_nonteaching WHERE employeeid = '$employeeid' AND date = '$date'");
+        }else{
+            $this->db->query("DELETE FROM employee_attendance_nonteaching WHERE employeeid = '$employeeid' AND date = '$date'");
+        }
     }
 }
 /* End of file employee.php */
