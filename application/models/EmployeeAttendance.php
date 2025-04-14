@@ -1389,7 +1389,7 @@ class EmployeeAttendance extends CI_Model {
         $last_login = $last_logout = "";
         $last_stime = $last_etime = "";
         $campus_tap = $this->attendance->getTapCampus($employeeid, $date);
-        $this->db->insert("for_trail", ["details" => $this->db->last_query()]);
+        
         // $holiday = $this->attcompute->isHolidayNew($employeeid, $date,$deptid, "", "", $teachingtype); 
         $holiday = $this->attcompute->isHolidayDetailed($employeeid, $date,$deptid, "", "", $teachingtype);
       
@@ -1464,7 +1464,7 @@ class EmployeeAttendance extends CI_Model {
             $sched_sec = round(abs(strtotime($sched_row->endtime) - strtotime($sched_row->starttime)),2);
 
             $previous_login = $previous_logout = "";
-
+            $this->db->insert("for_trail", ["details" => $this->db->last_query()]);
             foreach($schedule_result_data as $sched_key => $rsched){
                 $workdays = 0;
                 $ob_type = true;
