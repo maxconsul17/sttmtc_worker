@@ -87,7 +87,7 @@ class AttendanceManager
 
 		try{
 			$row = get_object_vars($job);
-			$this->worker_model->update_calculate_status($row, "ongoinssssg");
+			$this->worker_model->update_calculate_status($row, "ongoing");
 
 			$employeeid = $row["employeeid"];
 			$dfrom = $row["dfrom"];

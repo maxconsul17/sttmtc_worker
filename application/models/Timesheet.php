@@ -347,8 +347,7 @@ class Timesheet extends CI_Model {
   }
 
   function presentEmployeeToday(){
-    $datenow = date("Y-m-d");
-    return $this->db->query("SELECT * FROM facial_Log WHERE DATE(date) = '$datenow' GROUP BY employeeid");
+    return $this->db->query("SELECT * FROM facial_Log WHERE DATE(FROM_UNIXTIME(FLOOR(`time` / 1000))) = CURDATE() GROUP BY employeeid");
   }
 
   function attendanceDataForGraph(){
@@ -578,10 +577,10 @@ class Timesheet extends CI_Model {
   public function currentLogtimePMSchedule($emp_id, $date, $schedule, $early_dismissal, $used_time=array(), $prior_sched_start="", $prior_absent_start=""){
       $sched_with_date = $date." ".$schedule;
       $early_d_with_date = $date." ".$early_dismissal;
-      $prior_sched_start = $date." ".$prior_sched_start;
-      $prior_absent_start = $date." ".$prior_absent_start;
+      $where_clause = "";
       if($prior_sched_start){
-        $where_clause = " AND LEAST(FROM_UNIXTIME(FLOOR(`time` / 1000)), '$prior_sched_start') <= '$prior_sched_start'";
+        $prior_sched_start = $date." ".$prior_sched_start;
+        $where_clause = " AND FROM_UNIXTIME(FLOOR(`time` / 1000)) <= '$prior_sched_start'";
       }
       $q_logs = $this->db->query("SELECT 
                               FROM_UNIXTIME(FLOOR(`time` / 1000)) AS logtime
@@ -598,6 +597,7 @@ class Timesheet extends CI_Model {
       if($q_logs->num_rows() == 0){
           $where_clause = "";
           if($prior_absent_start){
+            $prior_absent_start = $date." ".$prior_absent_start;
             $where_clause = " AND FROM_UNIXTIME(FLOOR(`time` / 1000)) <= '$prior_absent_start'";
           }
           
@@ -808,6 +808,35 @@ class Timesheet extends CI_Model {
       }
   }
 
+  public function getEmployeeAttendance($employeeid, $date_range){
+    [$dateFrom, $dateTo] = $date_range;
+
+    $query = $this->db->query("SELECT * FROM timesheet WHERE userid = '$employeeid' AND DATE(timein) BETWEEN '$dateFrom' AND '$dateTo'");
+    if($query->num_rows() > 0){
+      $result = array_map(function($item){
+          unset($item['timeid']);
+          return $item;
+      },  $query->result_array());
+      return $result;
+    }else{
+      return [];
+    }
+  }
+
+  public function filterDuplicates($data){
+      $filteredData = [];
+
+      foreach ($data as $row) {
+          $this->db->where($row); 
+          $query = $this->db->get("timesheet");
+          
+          if ($query->num_rows() == 0) {
+              $filteredData[] = $row;
+          }
+      }
+
+      return $filteredData;
+  }
 }
 
 /* End of file timesheet.php */
