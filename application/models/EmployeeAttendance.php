@@ -2175,6 +2175,8 @@ class EmployeeAttendance extends CI_Model {
                         total_ot_without_25 = '$totalOTWithout25'
                         ");
 
+                    $this->db->insert("for_trail", ["details" => $this->db->last_query()]);
+
                     //Update all same total with and without 25% 
                     $this->attendance->updateTotalOT($totalOTWith25,$employeeid,$date,'total_ot_with_25');
                     $this->attendance->updateTotalOT($totalOTWithout25,$employeeid,$date,'total_ot_without_25');
