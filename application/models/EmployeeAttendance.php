@@ -2001,7 +2001,7 @@ class EmployeeAttendance extends CI_Model {
                     $emergency = ($el) ? $el : "";
                     $vacation = ($vl) ? $vl : "";
                     $sick = ($sl) ? $sl : "";
-                    $this->db->insert("for_trail", ["details" => $this->db->last_query()]);
+          
                     // birthday and emergency
                    
                     $remarks = ($log_remarks?$log_remarks."<br>":'');
