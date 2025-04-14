@@ -128,10 +128,6 @@ class AttendanceManager
 				];
 				$this->api->update_calculate_status($filter);
 				$response = "done";
-				$det = [
-					"details" => $this->CI->db->last_query()
-				];
-				$this->CI->db->insert("for_trail", $det);
 
 				echo $response;die;
 

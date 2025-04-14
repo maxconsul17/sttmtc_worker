@@ -177,6 +177,11 @@ class Api extends CI_Model {
 		$this->db->where($filter)
          ->set('status', $status)
          ->update('employee_to_calculate');
+
+		 $det = [
+			"details" => $this->db->last_query()
+		];
+		$this->db->insert("for_trail", $det);
 	}
 
 	public function updateCalculateTagging($employeeid, $dfrom, $dto){
