@@ -1464,7 +1464,7 @@ class EmployeeAttendance extends CI_Model {
             $sched_sec = round(abs(strtotime($sched_row->endtime) - strtotime($sched_row->starttime)),2);
 
             $previous_login = $previous_logout = "";
-            $this->db->insert("for_trail", ["details" => $this->db->last_query()]);
+
             foreach($schedule_result_data as $sched_key => $rsched){
                 $workdays = 0;
                 $ob_type = true;
@@ -2001,7 +2001,7 @@ class EmployeeAttendance extends CI_Model {
                     $emergency = ($el) ? $el : "";
                     $vacation = ($vl) ? $vl : "";
                     $sick = ($sl) ? $sl : "";
-          
+                    $this->db->insert("for_trail", ["details" => $this->db->last_query()]);
                     // birthday and emergency
                    
                     $remarks = ($log_remarks?$log_remarks."<br>":'');
