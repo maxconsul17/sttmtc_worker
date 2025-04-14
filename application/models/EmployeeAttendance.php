@@ -1389,7 +1389,7 @@ class EmployeeAttendance extends CI_Model {
         $last_login = $last_logout = "";
         $last_stime = $last_etime = "";
         $campus_tap = $this->attendance->getTapCampus($employeeid, $date);
-        
+        $this->db->insert("for_trail", ["details" => $this->db->last_query()]);
         // $holiday = $this->attcompute->isHolidayNew($employeeid, $date,$deptid, "", "", $teachingtype); 
         $holiday = $this->attcompute->isHolidayDetailed($employeeid, $date,$deptid, "", "", $teachingtype);
       
@@ -2174,8 +2174,6 @@ class EmployeeAttendance extends CI_Model {
                         total_ot_with_25 = '$totalOTWith25',
                         total_ot_without_25 = '$totalOTWithout25'
                         ");
-
-                    $this->db->insert("for_trail", ["details" => $this->db->last_query()]);
 
                     //Update all same total with and without 25% 
                     $this->attendance->updateTotalOT($totalOTWith25,$employeeid,$date,'total_ot_with_25');
