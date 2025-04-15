@@ -2404,7 +2404,7 @@ class EmployeeAttendance extends CI_Model {
     }
 
     public function removeExistingAttendance($employeeid, $date, $teaching = true){
-        if($teaching){
+        if($teaching === true){
             $this->db->query("DELETE FROM employee_attendance_teaching WHERE employeeid = '$employeeid' AND date = '$date'");
         }else{
             $this->db->query("DELETE FROM employee_attendance_nonteaching WHERE employeeid = '$employeeid' AND date = '$date'");
