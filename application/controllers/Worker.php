@@ -36,7 +36,7 @@ class Worker extends WorkerController
         $getFailedFacialJob = $this->facial_manager->getFailedFacialJob();
 
         if($getCalculateJob){
-            $this->attendance_manager->processCalculation($getCalculateJob);
+            $this->attendance_manager->processCalculation($getCalculateJob, $worker_id);
             return false;
         }
 

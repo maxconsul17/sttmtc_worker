@@ -82,55 +82,56 @@ class AttendanceManager
         $this->worker_model->updateAttendanceStatus($job_det->id, "done");
     }
 
-    public function processCalculation($job){
+    public function processCalculation($job, $worker_id){
         // $emp_list = $this->worker_model->fetch_emp_calculate();  // Fetch list of employees with attendance tasks
+		if($worker_id == 4){
+			try{
+				$row = get_object_vars($job);
+				$this->worker_model->update_calculate_status($row, "ongoing");
 
-		try{
-			$row = get_object_vars($job);
-			$this->worker_model->update_calculate_status($row, "ongoing");
+				$employeeid = $row["employeeid"];
+				$dfrom = $row["dfrom"];
+				$dto = $row["dto"];
+				// $hris_endpoint = $row["endpoint"];
+				// $this->calculate_attendance($employeeid, $dfrom, $dto, $hris_endpoint); // Calculate attendance for each employee
 
-			$employeeid = $row["employeeid"];
-			$dfrom = $row["dfrom"];
-			$dto = $row["dto"];
-			// $hris_endpoint = $row["endpoint"];
-			// $this->calculate_attendance($employeeid, $dfrom, $dto, $hris_endpoint); // Calculate attendance for each employee
+				if(isset($employeeid) && isset($dfrom) && isset($dto)){
 
-			if(isset($employeeid) && isset($dfrom) && isset($dto)){
+					// Update first employee_attendance_update , tag to 0 to avoid duplication of process
+					$this->api->updateCalculateTagging($employeeid, $dfrom, $dto);
 
-				// Update first employee_attendance_update , tag to 0 to avoid duplication of process
-				$this->api->updateCalculateTagging($employeeid, $dfrom, $dto);
+					$date_range = $this->attcompute->displayDateRange($dfrom, $dto);
+					// Globals::pd($date_range);die;
+					foreach($date_range as $date){
 
-				$date_range = $this->attcompute->displayDateRange($dfrom, $dto);
-				// Globals::pd($date_range);die;
-				foreach($date_range as $date){
+						// REPROCESS TIMESHEET BASED ON SCHEDULE
+						$this->timesheet->reprocessFacialLogBySchedule($employeeid, $date->dte);
 
-					// REPROCESS TIMESHEET BASED ON SCHEDULE
-					$this->timesheet->reprocessFacialLogBySchedule($employeeid, $date->dte);
-
-					$isteaching = $this->employee->getempteachingtype($employeeid);
-					$teaching_related = $this->employee->isTeachingRelated($employeeid);
-					if($isteaching){
-						$this->employeeAttendance->employeeAttendanceTeaching($employeeid, $date->dte);
-					}else{
-						if($teaching_related){
+						$isteaching = $this->employee->getempteachingtype($employeeid);
+						$teaching_related = $this->employee->isTeachingRelated($employeeid);
+						if($isteaching){
 							$this->employeeAttendance->employeeAttendanceTeaching($employeeid, $date->dte);
 						}else{
-							$this->employeeAttendance->employeeAttendanceNonteaching($employeeid, $date->dte);
+							if($teaching_related){
+								$this->employeeAttendance->employeeAttendanceTeaching($employeeid, $date->dte);
+							}else{
+								$this->employeeAttendance->employeeAttendanceNonteaching($employeeid, $date->dte);
+							}
 						}
 					}
+					
+					// UPDATE TASK STATUS
+					$filter = [
+						"employeeid" => $employeeid,
+						"dfrom" => $dfrom,
+						"dto" => $dto
+					];
+					$this->api->update_calculate_status($filter);
+					$response = "done";
+
+					echo $response;die;
+
 				}
-				
-				// UPDATE TASK STATUS
-				$filter = [
-					"employeeid" => $employeeid,
-					"dfrom" => $dfrom,
-					"dto" => $dto
-				];
-				$this->api->update_calculate_status($filter);
-				$response = "done";
-
-				echo $response;die;
-
 			}
 
 		}catch (Exception $e) {
