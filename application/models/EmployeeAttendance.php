@@ -1911,7 +1911,7 @@ class EmployeeAttendance extends CI_Model {
                     $late = $lateutlec;
                     $undertime = $utlec;
 
-                    if(!empty($holidayInfo) && $holidayInfo['type'] == 'OTHERS'){
+                    if(!empty($holidayInfo) && $holiday){
                         $actlog_time_in = $off_time_in;
                         $actlog_time_out = $off_time_out;
                         $log_remarks = str_replace('<span style="color:red">NO TIME IN AND OUT</span>', '', $log_remarks);
