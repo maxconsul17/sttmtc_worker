@@ -132,12 +132,13 @@ class AttendanceManager
 					echo $response;die;
 
 				}
+				
+			}catch (Exception $e) {
+				// SOME ERROR HANDLER HERE
+				$this->worker_model->update_calculate_status($row, "failed");
 			}
-
-		}catch (Exception $e) {
-			// SOME ERROR HANDLER HERE
-			$this->worker_model->update_calculate_status($row, "failed");
 		}
+
 		
         // // Loop through each employee and reprocess their attendance if applicable
         // if ($emp_list && $emp_list->num_rows() > 0) {
