@@ -368,7 +368,7 @@ class Timesheet extends CI_Model {
 
     if ($emp_sched->num_rows() > 0) {
         // Delete all timesheet data from facial
-        // $checklog_q = $this->db->query("DELETE FROM timesheet WHERE userid = '$emp_id' AND DATE(timein) = '$date' AND otype = 'Facial'");
+        $checklog_q = $this->db->query("DELETE FROM timesheet WHERE userid = '$emp_id' AND DATE(timein) = '$date' AND otype = 'Facial'");
         $first_sched = true;
         $last_timein = $last_timeout = "";
         $has_last_timein = $has_last_timeout = "";
@@ -575,51 +575,44 @@ class Timesheet extends CI_Model {
   }
 
   public function currentLogtimePMSchedule($emp_id, $date, $schedule, $early_dismissal, $used_time=array(), $prior_sched_start="", $prior_absent_start=""){
-      $sched_with_date = $date." ".$schedule;
-      $early_d_with_date = $date." ".$early_dismissal;
-      $where_clause = "";
-      if($prior_sched_start){
-        $prior_sched_start = $date." ".$prior_sched_start;
-        $where_clause = " AND FROM_UNIXTIME(FLOOR(`time` / 1000)) <= '$prior_sched_start'";
-      }
-      $q_logs = $this->db->query("SELECT 
+    $sched_with_date = $date." ".$schedule;
+    $early_d_with_date = $date." ".$early_dismissal;
+    $q_logs = $this->db->query("SELECT 
                               FROM_UNIXTIME(FLOOR(`time` / 1000)) AS logtime
                               FROM
                               facial_Log 
                               WHERE employeeid = '$emp_id' 
                               AND DATE(FROM_UNIXTIME(FLOOR(`time` / 1000))) = '$date' 
-                              AND LEAST(FROM_UNIXTIME(FLOOR(`time` / 1000)), '$sched_with_date') <= '$sched_with_date'
+                              AND FROM_UNIXTIME(FLOOR(`time` / 1000)) <= '$sched_with_date'
                               AND FROM_UNIXTIME(FLOOR(`time` / 1000)) >= '$early_d_with_date'
-                              $where_clause
                               ORDER BY ABS(TIME_TO_SEC(TIMEDIFF(FROM_UNIXTIME(FLOOR(`time` / 1000)), '$sched_with_date'))) ASC 
                               LIMIT 1 ");
-
-      if($q_logs->num_rows() == 0){
-          $where_clause = "";
-          if($prior_absent_start){
-            $prior_absent_start = $date." ".$prior_absent_start;
-            $where_clause = " AND FROM_UNIXTIME(FLOOR(`time` / 1000)) <= '$prior_absent_start'";
-          }
-          
-          $q_logs = $this->db->query("SELECT 
-                              FROM_UNIXTIME(FLOOR(`time` / 1000)) AS logtime
-                              FROM
-                              facial_Log 
-                              WHERE employeeid = '$emp_id' 
-                              AND DATE(FROM_UNIXTIME(FLOOR(`time` / 1000))) = '$date' 
-                              AND FROM_UNIXTIME(FLOOR(`time` / 1000)) >= '$sched_with_date'
-                              $where_clause
-                              ORDER BY ABS(TIME_TO_SEC(TIMEDIFF(FROM_UNIXTIME(FLOOR(`time` / 1000)), '$sched_with_date'))) ASC 
-                              LIMIT 1 ");
-          if($q_logs->num_rows() > 0){
-            return $q_logs->row()->logtime;
-          }
-      }else{
+    if($q_logs->num_rows() == 0){
+        $where_clause = "";
+        if($prior_sched_start){
+          $prior_sched_start = $date." ".$prior_sched_start;
+          $where_clause = " AND FROM_UNIXTIME(FLOOR(`time` / 1000)) < '$prior_sched_start'";
+        }
+        
+        $q_logs = $this->db->query("SELECT 
+                            FROM_UNIXTIME(FLOOR(`time` / 1000)) AS logtime
+                            FROM
+                            facial_Log 
+                            WHERE employeeid = '$emp_id' 
+                            AND DATE(FROM_UNIXTIME(FLOOR(`time` / 1000))) = '$date' 
+                            AND FROM_UNIXTIME(FLOOR(`time` / 1000)) >= '$sched_with_date'
+                            $where_clause
+                            ORDER BY ABS(TIME_TO_SEC(TIMEDIFF(FROM_UNIXTIME(FLOOR(`time` / 1000)), '$sched_with_date'))) ASC 
+                            LIMIT 1 ");
+        if($q_logs->num_rows() > 0){
           return $q_logs->row()->logtime;
-      }
+        }
+    }else{
+        return $q_logs->row()->logtime;
+    }
 
-      return false;
-  }
+    return false;
+}
 
   
   public function attendanceReprocessFacialLogBySchedule($emp_id, $date) {
