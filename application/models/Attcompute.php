@@ -1268,6 +1268,7 @@ class Attcompute extends CI_Model {
             LEFT JOIN group_overtime c ON c.base_id = b.id
             LEFT JOIN list_item_overtime d ON d.group_overtime_id = c.id
             WHERE a.employeeid = ? AND c.date = ?
+            AND d.start_time IS NOT NULL AND d.end_time IS NOT NULL
             ORDER BY c.date DESC
             LIMIT 1
         ", [$eid, $date]); // Secure parameter binding
