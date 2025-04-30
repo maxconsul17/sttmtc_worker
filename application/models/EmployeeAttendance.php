@@ -1762,6 +1762,12 @@ class EmployeeAttendance extends CI_Model {
                         }
                     }
 
+                    // REMOVE LOG IF IT USED ON FIRST SCHEDULE BUT  NOT USABLE IN NEXT SCHEDULE
+                    if($seq > 1){
+                        if (strtotime($stime) > strtotime($logout) && $last_logout == $login) {
+                            $login = "";
+                        }
+                    }
 
                     $previous_login = $login;
                     $previous_logout = $logout;
@@ -2068,6 +2074,9 @@ class EmployeeAttendance extends CI_Model {
                     
                         // Handle case where an upcoming login exists.
                         if ($upcomingLogin) {
+                            $undertime = $absent_data;
+                            $absent_data = '';
+                        }else if($last_login && $last_logout){
                             $late = $absent_data;
                             $absent_data = '';
                         }
