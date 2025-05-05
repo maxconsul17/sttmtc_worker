@@ -52,7 +52,7 @@ class ReportManager
         
         // Fetch employees for the report
         $employeelist = $this->worker_model->getEmployeeList($det->where_clause, $worker_id, $det->id);
-        // $this->worker_model->forTrail();
+        $this->worker_model->forTrail($this->db->last_query());
 
         foreach ($employeelist as $employee) {
             try {
