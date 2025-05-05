@@ -114,15 +114,7 @@
                                     $PM_arrival = (isset($att_date[$lastDataIndexPerDate]) && count($att_date) > 1 ? $att_date[$lastDataIndexPerDate]->actlog_time_in:'');
                                     $PM_departure = (isset($lastDataIndexPerDate) && count($att_date) > 1 ? $att_date[$lastDataIndexPerDate]->actlog_time_out:'');
     
-                                    list($hour,$minute) = $this->time->totalLateUndertimeDuration($att_date);
-    
-                                    $remarks = "";
-                                    // $remarks = (isset($att_date[$lastDataIndexPerDate])  ?$this->time->formatTimeOutput($att_date[$lastDataIndexPerDate]->remarks) : '');
-                                    if($this->worker_model->displaySched($employeeid, $date_arr)->num_rows() == 0){
-                                        // $remarks = "No Shedule";
-                                        $remarks = date("l", strtotime($date_arr));
-                                    }
-    
+                               
                                     // if (strpos($remarks, "PENDING") !== false) {
                                     //     $remarks = "";
                                     // }
