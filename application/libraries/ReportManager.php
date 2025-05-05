@@ -67,6 +67,7 @@ class ReportManager
                 $data['attendance'] = $this->worker_model->getEmployeeDTR($employee->employeeid, $det->dfrom, $det->dto, $isteaching);
                 $data['dtrcutoff'] = date('F d, Y', strtotime($det->dfrom)) . ' - ' . date('F d, Y', strtotime($det->dto));
                 // Load the appropriate report view
+                $this->worker_model->forTrail("123123");
                 $report = $this->CI->load->view(
                     $isteaching ? 'dtr/teachingDailyTimeReport' : 'dtr/nonteachingDailyTimeReport',
                     $data,
