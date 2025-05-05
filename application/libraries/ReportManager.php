@@ -72,10 +72,10 @@ class ReportManager
                     $data,
                     TRUE
                 );
-                $this->worker_model->forTrail("123sss");
+
                 // Update the report breakdown and generate the PDF
                 $this->worker_model->updateReportBreakdown("done", $employee->rep_breakdown_id, $det->id);
-$this->worker_model->forTrail("here");
+
                 $data["report_list"] = [["report" => $report]];
                 $data["path"] = "files/reports/pdf/{$employee->employeeid}_{$det->id}.pdf";
 

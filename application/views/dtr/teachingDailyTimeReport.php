@@ -140,16 +140,58 @@
                                     // }
     
                                     foreach($att_date as $k => $v){
-                                      
+                                        if($v->holiday){
+                                            $remarks = "Holiday";
+                                        }else if (strpos($v->remarks, 'UNDERTIME') !== false){
+                                            if($v->actlog_time_in == "--" && strtotime($v->actlog_time_out) >= strtotime($v->off_time_out)){
+                                                // $remarks = "";
+                                            }
+                                        }else if(strpos($v->remarks, 'NO TIME IN') !== false){
+                                            if($v->off_time_in != "--" && $v->off_time_out != "--"){
+                                                if($v->actlog_time_in == "--" && $v->actlog_time_out == "--"){
+                                                    // $remarks = '<span style="color:red">ABSENT</span>'; 
+                                                }else if(($v->actlog_time_in == "--" && $v->actlog_time_out != "--") || ($v->actlog_time_in != "--" && $v->actlog_time_out == "--")){
+                                                    if($AM_arrival == "" && $PM_departure == ""){
+                                                        // $remarks = '<span style="color:red">UNDERTIME</span>'; 
+                                                    }else{
+                                                        // $remarks = "";
+                                                    }
+                                                }
+                                            }
+                                        }else if(strpos($v->remarks, 'OFFICIAL BUSINESS') !== false){
+                                            $AM_arrival = $AM_departure = $PM_arrival = $PM_departure = "";
+                                        }
                                     }
                                     
     
+                                    if($this->time->validateDateBetween($actual_dates, $date_arr) === false){
+                                        $AM_arrival = $AM_departure = $PM_arrival = $PM_departure = $hour = $minute = $remarks = "";
+                                    }
+    
+                                    $date = $this->time->DayFormatted($date_arr);
     
                                 }else{
-                                   
+                                    if($this->worker_model->displaySched($employeeid, $date_arr)->num_rows() == 0){
+                                        $AM_arrival = $AM_departure = $PM_arrival = $PM_departure = $hour = $minute = "";
+                                        $date = $this->time->DayFormatted($date_arr);
+                                        $remarks = date("l", strtotime($date_arr));
+                                    }
                                 }
 
-                             
+                                $hour = $minute = 0;
+                                $att_mirror .= '
+                                <tr>
+                                    <td class="tc" rowspan=2>'.(date("d-M (l)",strtotime($date_arr))).'</td>
+                                    <td class="tc td-height">'.$AM_arrival.'</td>
+                                    <td class="tc td-height">'.$AM_departure.'</td>
+                                    <td class="tc" rowspan=2 >'.$remarks.'</td>
+                                    <td> </td>
+                                </tr>
+                                <tr>
+                                    <td class="tc td-height">'.$PM_arrival.'</td>
+                                    <td class="tc td-height">'.$PM_departure.'</td>
+                                </tr>'
+                                ;
                             }
 
                         $att_mirror .= '
