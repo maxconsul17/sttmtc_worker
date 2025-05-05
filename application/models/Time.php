@@ -499,53 +499,6 @@ class Time extends CI_Model {
     }
   }
 
-  public function getRemainingMonths($date){
-    // Convert the input date to a DateTime object
-    $inputDate = new DateTime($date);
-    
-    // Set the date to the end of the year (December 31)
-    $endOfYear = new DateTime('2025-12-31');
-    
-    // Calculate the difference between the input date and the end of the year
-    $diff = $inputDate->diff($endOfYear);
-    
-    // Return the remaining months
-    return $diff->m + 1; // Add 1 because it includes the current month
-}
-
- 
-  /*
-   *  Total Time 
-   */ 
-  function exp_time($time) { //explode time and convert into seconds
-    $time = explode(':', $time);
-    $h = $m = 0;
-    if(isset($time[0]) && is_numeric($time[0])) { $h = $time[0];} else{ $h = 0;}
-    if(isset($time[1]) && is_numeric($time[1])) { $m = $time[1]; }else {$m = 0;}
-    $time = $h * 3600 + $m * 60;
-    return $time;
-}
-
-function sec_to_hm($time) { //convert seconds to hh:mm
-  $time = (int) $time;
-  if(is_numeric($time)){
-      $hour = floor($time / 3600);
-      $minute = strval(floor(($time % 3600) / 60));
-      if ($minute == 0) {
-          $minute = "00";
-      } else {
-          $minute = $minute;
-      }
-
-      if ($hour == 0) {
-          $hour = "00";
-      } else {
-          $hour = $hour;
-      }
-      $time = $hour . ":" . str_pad($minute,2,'0',STR_PAD_LEFT);
-      return $time;
-  }
-
 }
 /* End of file time.php */
 /* Location: ./application/models/time.php */
