@@ -164,11 +164,6 @@
                                     }
                                     
     
-                                    if($this->time->validateDateBetween($actual_dates, $date_arr) === false){
-                                        $AM_arrival = $AM_departure = $PM_arrival = $PM_departure = $hour = $minute = $remarks = "";
-                                    }
-    
-                                    $date = $this->time->DayFormatted($date_arr);
     
                                 }else{
                                     if($this->worker_model->displaySched($employeeid, $date_arr)->num_rows() == 0){
