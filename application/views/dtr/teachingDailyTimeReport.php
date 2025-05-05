@@ -169,7 +169,6 @@
                                     }
     
                                     $date = $this->time->DayFormatted($date_arr);
-                                    $this->worker_model->forTrail("im here 6");
     
                                 }else{
                                     if($this->worker_model->displaySched($employeeid, $date_arr)->num_rows() == 0){
@@ -216,7 +215,7 @@
                 </td>';
 
             $content = $content.$att_mirror;
-
+            $this->worker_model->forTrail("im here 7");
            $content.=' </tr>
         </table>';
         echo $style.$content;
