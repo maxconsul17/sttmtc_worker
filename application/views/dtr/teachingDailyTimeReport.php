@@ -140,27 +140,7 @@
                                     // }
     
                                     foreach($att_date as $k => $v){
-                                        if($v->holiday){
-                                            $remarks = "Holiday";
-                                        }else if (strpos($v->remarks, 'UNDERTIME') !== false){
-                                            if($v->actlog_time_in == "--" && strtotime($v->actlog_time_out) >= strtotime($v->off_time_out)){
-                                                // $remarks = "";
-                                            }
-                                        }else if(strpos($v->remarks, 'NO TIME IN') !== false){
-                                            if($v->off_time_in != "--" && $v->off_time_out != "--"){
-                                                if($v->actlog_time_in == "--" && $v->actlog_time_out == "--"){
-                                                    // $remarks = '<span style="color:red">ABSENT</span>'; 
-                                                }else if(($v->actlog_time_in == "--" && $v->actlog_time_out != "--") || ($v->actlog_time_in != "--" && $v->actlog_time_out == "--")){
-                                                    if($AM_arrival == "" && $PM_departure == ""){
-                                                        // $remarks = '<span style="color:red">UNDERTIME</span>'; 
-                                                    }else{
-                                                        // $remarks = "";
-                                                    }
-                                                }
-                                            }
-                                        }else if(strpos($v->remarks, 'OFFICIAL BUSINESS') !== false){
-                                            $AM_arrival = $AM_departure = $PM_arrival = $PM_departure = "";
-                                        }
+                                      
                                     }
                                     
     
