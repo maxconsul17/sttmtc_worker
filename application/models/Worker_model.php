@@ -88,7 +88,7 @@ class Worker_model extends CI_Model {
         AND e.base_id = '$report_id'
         AND e.status = 'pending'
         ORDER BY fullname ASC
-        ")->result();
+        ");
     }
 
     public function getempteachingtype($user = ""){
