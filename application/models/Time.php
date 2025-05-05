@@ -531,6 +531,20 @@ class Time extends CI_Model {
         
     }
 
+    function extractTimeComponent($time, $component)
+    {
+        list($hour, $minute) = explode(':', $time);
+
+        switch ($component) {
+            case 'hour':
+                return $hour;
+            case 'minute':
+                return $minute;
+            default:
+                throw new InvalidArgumentException("Invalid time component specified. Use 'hour' or 'minute'.");
+        }
+    }
+
 }
 /* End of file time.php */
 /* Location: ./application/models/time.php */
