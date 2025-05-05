@@ -41,7 +41,7 @@ class ReportManager
 
     // Process the DTR report for a given report task
     public function process_dtr($det, $worker_id){
-        $this->worker_model->updateReportStatus($det->id, "", "ongoing");
+        $this->worker_model->updateReportStatus($det->id, "", "ongoingsss");
         if ($det->total_tasks == "0") $this->worker_model->updateReportStatus($det->id, "", "No employee to generate");
 
         // Prepare date range
@@ -50,10 +50,9 @@ class ReportManager
         // $det->dfrom = $dates["first_date"];
         // $det->dto = $dates["last_date"];
         
-        $this->worker_model->forTrail($this->db->last_query());
         // Fetch employees for the report
         $employeelist = $this->worker_model->getEmployeeList($det->where_clause, $worker_id, $det->id);
-        $this->worker_model->forTrail($this->db->last_query());
+        // $this->worker_model->forTrail();
 
         foreach ($employeelist as $employee) {
             try {
@@ -64,7 +63,6 @@ class ReportManager
                 }
 
                 // Prepare data for the report
-                // $this->worker_model->forTrail("im debugging");
                 $isteaching = $this->worker_model->getempteachingtype($employee->employeeid);
                 $data['report_id'] =  $det->id;
                 $data['campus'] = $employee->campusid;
