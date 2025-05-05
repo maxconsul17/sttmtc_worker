@@ -218,5 +218,7 @@
 
            $content.=' </tr>
         </table>';
+        $this->worker_model->forTrail(error_get_last());
+
         echo $style.$content;
 ?>
