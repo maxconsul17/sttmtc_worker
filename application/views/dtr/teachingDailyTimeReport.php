@@ -169,22 +169,16 @@
                                     }
     
                                     $date = $this->time->DayFormatted($date_arr);
-                                    $this->worker_model->forTrail("im here 7");
-
     
                                 }else{
-                                    $this->worker_model->forTrail("im here 10");
                                     if($this->worker_model->displaySched($employeeid, $date_arr)->num_rows() == 0){
-                                        $this->worker_model->forTrail("im here 8");
                                         $AM_arrival = $AM_departure = $PM_arrival = $PM_departure = $hour = $minute = "";
                                         $date = $this->time->DayFormatted($date_arr);
                                         $remarks = date("l", strtotime($date_arr));
-                                        $this->worker_model->forTrail("im here 9");
                                     }
                                 }
 
                                 $hour = $minute = 0;
-                                $this->worker_model->forTrail("im here 11");
                                 $att_mirror .= '
                                 <tr>
                                     <td class="tc" rowspan=2>'.(date("d-M (l)",strtotime($date_arr))).'</td>
@@ -198,8 +192,6 @@
                                     <td class="tc td-height">'.$PM_departure.'</td>
                                 </tr>'
                                 ;
-
-                                $this->worker_model->forTrail("im here 12");
                             }
 
                         $att_mirror .= '
@@ -223,6 +215,7 @@
                 </td>';
 
             $content = $content.$att_mirror;
+
            $content.=' </tr>
         </table>';
         echo $style.$content;
