@@ -499,6 +499,38 @@ class Time extends CI_Model {
     }
   }
 
+  function totalLateUndertimeDuration($datas)
+    {
+        $totalHour = 0;
+        $totalMinute = 0;
+        foreach($datas as $data)
+        {
+            if($data->lateut_lec && $data->lateut_lec != '--')
+            {
+                $totalHour += (int) $this->time->extractTimeComponent($data->lateut_lec,'hour');
+                $totalMinute += (int) $this->time->extractTimeComponent($data->lateut_lec,'minute');
+            }
+            if($data->lateut_lab && $data->lateut_lab != '--')
+            {
+                $totalHour += (int) $this->time->extractTimeComponent($data->lateut_lab,'hour');
+                $totalMinute += (int) $this->time->extractTimeComponent($data->lateut_lab,'minute');
+            }
+            if($data->lateut_admin && $data->lateut_admin != '--')
+            {
+                $totalHour += (int) $this->time->extractTimeComponent($data->lateut_admin,'hour');
+                $totalMinute += (int) $this->time->extractTimeComponent($data->lateut_admin,'minute');
+            }
+            if($data->lateut_overload && $data->lateut_overload != '--')
+            {
+                $totalHour += (int) $this->time->extractTimeComponent($data->lateut_overload,'hour');
+                $totalMinute += (int) $this->time->extractTimeComponent($data->lateut_overload,'minute');
+            }
+        }
+
+        return [$totalHour,$totalMinute];
+        
+    }
+
 }
 /* End of file time.php */
 /* Location: ./application/models/time.php */
