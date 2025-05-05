@@ -58,7 +58,7 @@ class ReportManager
                     $this->worker_model->updateReportStatus($det->id, "", "cancelled", 0);
                     break;
                 }
-                $this->worker_model->forTrail("im here 1");
+
                 // Prepare data for the report
                 $isteaching = $this->worker_model->getempteachingtype($employee->employeeid);
                 $data['report_id'] =  $det->id;
@@ -67,13 +67,12 @@ class ReportManager
                 $data['attendance'] = $this->worker_model->getEmployeeDTR($employee->employeeid, $det->dfrom, $det->dto, $isteaching);
                 $data['dtrcutoff'] = date('F d, Y', strtotime($det->dfrom)) . ' - ' . date('F d, Y', strtotime($det->dto));
                 // Load the appropriate report view
-                $this->worker_model->forTrail("im here 2");
                 $report = $this->CI->load->view(
                     $isteaching ? 'dtr/teachingDailyTimeReport' : 'dtr/nonteachingDailyTimeReport',
                     $data,
                     TRUE
                 );
-$this->worker_model->forTrail("im here 3");
+
                 // Update the report breakdown and generate the PDF
                 $this->worker_model->updateReportBreakdown("done", $employee->rep_breakdown_id, $det->id);
 
