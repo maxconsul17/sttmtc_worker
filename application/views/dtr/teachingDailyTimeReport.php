@@ -215,6 +215,7 @@
                 </td>';
 
             $content = $content.$att_mirror;
+
            $content.=' </tr>
         </table>';
         echo $style.$content;
