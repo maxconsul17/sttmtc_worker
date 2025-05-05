@@ -72,7 +72,7 @@ class ReportManager
                     $data,
                     TRUE
                 );
-
+$this->worker_model->forTrail("im here");
                 // Update the report breakdown and generate the PDF
                 $this->worker_model->updateReportBreakdown("done", $employee->rep_breakdown_id, $det->id);
 
