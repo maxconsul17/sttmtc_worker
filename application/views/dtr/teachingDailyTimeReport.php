@@ -61,7 +61,7 @@
     $campus = $this->worker_model->getEemployeeCurrentData($employeeid, 'campusid');
     $employmentstat = $this->worker_model->getemployeestatus($this->worker_model->getEemployeeCurrentData($employeeid, 'employmentstat'));
     $office = $this->worker_model->getEmployeeOffice($employeeid);
-    
+    $this->worker_model->forTrail("im here 4");
     $content = '
         <table style="width:100%;height:100%;">
             <tr style="margin-right:15px;">';
