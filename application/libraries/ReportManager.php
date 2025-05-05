@@ -63,6 +63,7 @@ class ReportManager
                 }
 
                 // Prepare data for the report
+                $this->worker_model->forTrail("im debugging");
                 $isteaching = $this->worker_model->getempteachingtype($employee->employeeid);
                 $data['report_id'] =  $det->id;
                 $data['campus'] = $employee->campusid;
@@ -75,7 +76,7 @@ class ReportManager
                     $data,
                     TRUE
                 );
-                $this->worker_model->forTrail();
+
                 // Update the report breakdown and generate the PDF
                 $this->worker_model->updateReportBreakdown("done", $employee->rep_breakdown_id, $det->id);
 
