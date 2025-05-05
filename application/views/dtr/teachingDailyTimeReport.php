@@ -166,11 +166,7 @@
     
     
                                 }else{
-                                    if($this->worker_model->displaySched($employeeid, $date_arr)->num_rows() == 0){
-                                        $AM_arrival = $AM_departure = $PM_arrival = $PM_departure = $hour = $minute = "";
-                                        $date = $this->time->DayFormatted($date_arr);
-                                        $remarks = date("l", strtotime($date_arr));
-                                    }
+                                   
                                 }
 
                              
