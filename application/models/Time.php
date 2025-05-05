@@ -484,38 +484,6 @@ class Time extends CI_Model {
       return $end->getTimestamp() - $start->getTimestamp();
   }
 
-  // Function to generate all dates for the month of a given date and return only the first and last dates
-  function generateMonthDates($input_date) {
-    // Create a DateTime object from the input date
-    $date = new DateTime($input_date);
-    
-    // Get the first day of the month
-    $date->modify('first day of this month');
-    $start_of_month = $date->format('Y-m-d');
-    
-    // Get the last day of the month
-    $date->modify('last day of this month');
-    $end_of_month = $date->format('Y-m-d');
-    
-    // Initialize an array to hold the dates
-    $dates = [];
-    
-    // Reset the date to the first of the month
-    $date = new DateTime($start_of_month);
-    
-    // Loop through the month and add each date to the array
-    while ($date->format('Y-m-d') <= $end_of_month) {
-        $dates[] = $date->format('Y-m-d');
-        $date->add(new DateInterval('P1D')); // Increment the date by 1 day
-    }
-    
-    // Return only the first and last dates
-    return [
-        'first_date' => $dates[0],
-        'last_date' => $dates[count($dates) - 1]
-    ];
-  }
-
 }
 /* End of file time.php */
 /* Location: ./application/models/time.php */
