@@ -88,7 +88,7 @@ class Worker_model extends CI_Model {
         AND e.base_id = '$report_id'
         AND e.status = 'pending'
         ORDER BY fullname ASC
-        ");
+        ")->result();
     }
 
     public function getempteachingtype($user = ""){
@@ -356,7 +356,7 @@ class Worker_model extends CI_Model {
         $this->db->where("id", $report_breakdown_id)
                  ->set("status", $report_status)
                  ->update("report_breakdown");
-    
+        $this->forTrail();
         // Increment completed_tasks in report_list
         $this->db->query("UPDATE report_list SET completed_tasks = completed_tasks + 1 WHERE id = '$report_id'");
     
