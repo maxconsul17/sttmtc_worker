@@ -181,15 +181,15 @@
                                 $hour = $minute = 0;
                                 $att_mirror .= '
                                 <tr>
-                                    <td class="tc" rowspan=2>'.(date("d-M (l)",strtotime($date_arr))).'</td>
-                                    <td class="tc td-height">'.$AM_arrival.'</td>
-                                    <td class="tc td-height">'.$AM_departure.'</td>
-                                    <td class="tc" rowspan=2 >'.$remarks.'</td>
+                                    <td class="tc" rowspan=2></td>
+                                    <td class="tc td-height"></td>
+                                    <td class="tc td-height"></td>
+                                    <td class="tc" rowspan=2 ></td>
                                     <td> </td>
                                 </tr>
                                 <tr>
-                                    <td class="tc td-height">'.$PM_arrival.'</td>
-                                    <td class="tc td-height">'.$PM_departure.'</td>
+                                    <td class="tc td-height"></td>
+                                    <td class="tc td-height"></td>
                                 </tr>'
                                 ;
                             }
@@ -218,7 +218,5 @@
 
            $content.=' </tr>
         </table>';
-        $this->worker_model->forTrail(error_get_last());
-
         echo $style.$content;
 ?>
