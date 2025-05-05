@@ -67,11 +67,7 @@ class ReportManager
                 $data['attendance'] = $this->worker_model->getEmployeeDTR($employee->employeeid, $det->dfrom, $det->dto, $isteaching);
                 $data['dtrcutoff'] = date('F d, Y', strtotime($det->dfrom)) . ' - ' . date('F d, Y', strtotime($det->dto));
                 // Load the appropriate report view
-                $report = $this->CI->load->view(
-                    $isteaching ? 'dtr/teachingDailyTimeReport' : 'dtr/nonteachingDailyTimeReport',
-                    $data,
-                    TRUE
-                );
+              $report = "";
                 $this->worker_model->forTrail("123");
                 // Update the report breakdown and generate the PDF
                 $this->worker_model->updateReportBreakdown("done", $employee->rep_breakdown_id, $det->id);
