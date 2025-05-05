@@ -50,6 +50,7 @@ class ReportManager
         // $det->dfrom = $dates["first_date"];
         // $det->dto = $dates["last_date"];
         
+        $this->worker_model->forTrail($this->db->last_query());
         // Fetch employees for the report
         $employeelist = $this->worker_model->getEmployeeList($det->where_clause, $worker_id, $det->id);
         $this->worker_model->forTrail($this->db->last_query());
