@@ -184,6 +184,7 @@
                                 }
 
                                 $hour = $minute = 0;
+                                $this->worker_model->forTrail("im here 11");
                                 $att_mirror .= '
                                 <tr>
                                     <td class="tc" rowspan=2>'.(date("d-M (l)",strtotime($date_arr))).'</td>
@@ -197,6 +198,8 @@
                                     <td class="tc td-height">'.$PM_departure.'</td>
                                 </tr>'
                                 ;
+
+                                $this->worker_model->forTrail("im here 12");
                             }
 
                         $att_mirror .= '
