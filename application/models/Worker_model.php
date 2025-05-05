@@ -352,6 +352,7 @@ class Worker_model extends CI_Model {
     }
 
     public function updateReportBreakdown($report_status, $report_breakdown_id, $report_id) {
+        $this->worker_model->forTrail("123s");
         // Update report_breakdown status
         $this->db->where("id", $report_breakdown_id)
                  ->set("status", $report_status)
