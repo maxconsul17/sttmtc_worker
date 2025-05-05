@@ -122,6 +122,7 @@
                                         // $remarks = "No Shedule";
                                         $remarks = date("l", strtotime($date_arr));
                                     }
+                                    $this->worker_model->forTrail("im here 5");
     
                                     // if (strpos($remarks, "PENDING") !== false) {
                                     //     $remarks = "";
@@ -218,6 +219,5 @@
 
            $content.=' </tr>
         </table>';
-        $this->worker_model->forTrail("im here 5");
         echo $style.$content;
 ?>
