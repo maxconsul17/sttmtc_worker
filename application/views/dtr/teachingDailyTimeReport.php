@@ -122,7 +122,6 @@
                                         // $remarks = "No Shedule";
                                         $remarks = date("l", strtotime($date_arr));
                                     }
-                                    $this->worker_model->forTrail("im here 5");
     
                                     // if (strpos($remarks, "PENDING") !== false) {
                                     //     $remarks = "";
@@ -170,6 +169,7 @@
                                     }
     
                                     $date = $this->time->DayFormatted($date_arr);
+                                    $this->worker_model->forTrail("im here 6");
     
                                 }else{
                                     if($this->worker_model->displaySched($employeeid, $date_arr)->num_rows() == 0){
