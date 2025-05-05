@@ -215,7 +215,6 @@
                 </td>';
 
             $content = $content.$att_mirror;
-            $this->worker_model->forTrail("im here 7");
            $content.=' </tr>
         </table>';
         echo $style.$content;
