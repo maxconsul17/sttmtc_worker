@@ -356,10 +356,10 @@ class Worker_model extends CI_Model {
         $this->db->where("id", $report_breakdown_id)
                  ->set("status", $report_status)
                  ->update("report_breakdown");
-    
+                 $this->worker_model->forTrail("heress");
         // Increment completed_tasks in report_list
         $this->db->query("UPDATE report_list SET completed_tasks = completed_tasks + 1 WHERE id = '$report_id'");
-    
+        $this->worker_model->forTrail("heressss");
         // Update report_list status if completed_tasks = total_tasks
         $this->db->set("status", "done")
                  ->set("done_time", $this->getServerTime())
