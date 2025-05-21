@@ -161,7 +161,7 @@ class Attcompute extends CI_Model {
                 AND ( TIME(timeout) >= '$earlyd' ) 
                 AND timein != timeout
                 $add_wc
-                AND (UNIX_TIMESTAMP(timeout) - UNIX_TIMESTAMP(timein) ) > '60' 
+                AND (UNIX_TIMESTAMP(timeout) - UNIX_TIMESTAMP(timein) ) > '300' 
                 ORDER BY timein DESC LIMIT 1");
 
  
@@ -308,7 +308,7 @@ class Attcompute extends CI_Model {
                     // $return = array($timein,"","",$haslog);
                 }else{
                     $haslog = false;
-                    $checklog_q = $this->db->query("SELECT timein,timeout, addedby, otype FROM $tbl WHERE userid='$eid' AND DATE(timein)='$date' ORDER BY timein DESC LIMIT $seq"); // lol timeid to timein DESC
+                    $checklog_q = $this->db->query("SELECT timein,timeout, addedby, otype FROM $tbl WHERE userid='$eid' AND DATE(timein)='$date' AND (UNIX_TIMESTAMP(timeout) - UNIX_TIMESTAMP(timein) ) > '300'  ORDER BY timein DESC LIMIT $seq"); // lol timeid to timein DESC
                   
                     if($checklog_q->num_rows() > 0) $haslog = true;
                     if($haslog){
@@ -357,20 +357,20 @@ class Attcompute extends CI_Model {
                         }
                         $otype = true;
                     }else{
-                        
+                        // COMMENTED ALL BY MAX NO NEED NA PARA SA CONDITION DITO - STMTCCHYP-1209 DI NA TAYO TITINGIN SA LOGIN_ATTEMPTS_TERMINAL
                         // DISPLAY THE TIME-IN OF EMPLOYEE IMMEDIATELY.
-                        $query = $this->db->select('stamp_in, stamp_out, DATE(FROM_UNIXTIME(FLOOR(`time_in`/1000))) AS datecreated')
-                                ->from('login_attempts_terminal')
-                                ->where('user_id', $eid)
-                                ->where("DATE(FROM_UNIXTIME(FLOOR(`time_in`/1000)))", $date)
-                                ->get();
+                        // $query = $this->db->select('stamp_in, stamp_out, DATE(FROM_UNIXTIME(FLOOR(`time_in`/1000))) AS datecreated')
+                        //         ->from('login_attempts_terminal')
+                        //         ->where('user_id', $eid)
+                        //         ->where("DATE(FROM_UNIXTIME(FLOOR(`time_in`/1000)))", $date)
+                        //         ->get();
 
-                        $rows = $query->result_array();
-                        $haslog = false;
-                        if($query->num_rows() > 0) $haslog = true;
-                        if($haslog){
-                            $timein = $rows[0]['stamp_in'];
-                        }
+                        // $rows = $query->result_array();
+                        // $haslog = false;
+                        // if($query->num_rows() > 0) $haslog = true;
+                        // if($haslog){
+                        //     $timein = $rows[0]['stamp_in'];
+                        // }
 
                     }
                 }
@@ -1123,7 +1123,7 @@ class Attcompute extends CI_Model {
             $return.=($return?", CHANGE SCHEDULE APPLICATION":"CHANGE SCHEDULE APPLICATION");
         }
 
-        $query4 = $this->db->query("SELECT a.id FROM sc_app_emplist a INNER JOIN sc_app b ON a.base_id = b.id WHERE `date`='$date' AND a.employeeid='$eid' AND a.status = 'PENDING'"); 
+        $query4 = $this->db->query("SELECT a.id FROM sc_app_emplist a INNER JOIN sc_app b ON a.base_id = b.id WHERE `date`='$date' AND a.employeeid='$eid' AND b.status = 'PENDING'"); 
         if($query4->num_rows() > 0){  
             $return.=($return?", SERVICE CREDIT APPLICATION":"SERVICE CREDIT APPLICATION");
         }
@@ -1268,6 +1268,7 @@ class Attcompute extends CI_Model {
             LEFT JOIN group_overtime c ON c.base_id = b.id
             LEFT JOIN list_item_overtime d ON d.group_overtime_id = c.id
             WHERE a.employeeid = ? AND c.date = ?
+            AND d.start_time IS NOT NULL AND d.end_time IS NOT NULL
             ORDER BY c.date DESC
             LIMIT 1
         ", [$eid, $date]); // Secure parameter binding
@@ -1520,7 +1521,7 @@ class Attcompute extends CI_Model {
     
     function holidayInfo($date=""){
         $return=array();
-        $sql = $this->db->query("SELECT a.withPay, a.holiday_type, a.description, b.hdescription, b.code, a.holiday_rate,c.sched_count
+        $sql = $this->db->query("SELECT a.withPay, a.description AS 'holiday_code', a.holiday_type, a.description, b.hdescription, b.code, a.holiday_rate,c.sched_count
         FROM code_holiday_type a
         LEFT JOIN code_holidays b ON a.`holiday_type` = b.holiday_type
         LEFT JOIN code_holiday_calendar c ON b.`holiday_id` = c.holiday_id
@@ -1528,6 +1529,7 @@ class Attcompute extends CI_Model {
         foreach($sql->result() as $row)
         {
             $return["holiday_type"] = $row->holiday_type;
+            $return["holiday_code"] = $row->holiday_code;
             $return["withPay"] = $row->withPay;
             $return["type"] = $row->description;
             $return["description"] = $row->hdescription;
@@ -1591,7 +1593,7 @@ class Attcompute extends CI_Model {
                     if ($holiday[0]->teaching_type == "all" OR $holiday[0]->teaching_type == $teachingtype) {
 
                         if ($holiday[0]->payment_type == "all" OR $holiday[0]->payment_type == $paymentType) {
-
+                            if($deptid == 'LB') $deptid = 'LIB'; // hindi nya mahanap yung deptid dahil yung deptid sa holiday is LIB
                             $que = $this->db->query("SELECT status_included from holiday_inclusions where holi_cal_id = '{$holiday_id}' AND dept_included = '{$deptid}' AND status_included IS NOT NULL");
     
                             if($que->num_rows() > 0)
@@ -1737,13 +1739,20 @@ class Attcompute extends CI_Model {
     
         return $query->num_rows();
     }
-
     function getServiceCreditStatus($employeeid, $date) {
-        $query = $this->db->query("SELECT b.upstatus as app_status FROM sc_app a LEFT JOIN sc_app_emplist b ON a.id = b.base_id WHERE b.employeeid = '$employeeid' AND DATE(date_applied) = '$date' AND b.upstatus IN ('PENDING', 'APPROVED')");
+        $query = $this->db->query(
+            "SELECT a.status as `status` 
+             FROM sc_app a 
+             LEFT JOIN sc_app_emplist b ON a.id = b.base_id 
+             WHERE b.employeeid = ? 
+               AND `date` = ? 
+               AND a.status IN ('PENDING', 'APPROVED')",
+             array($employeeid, $date)
+        );
     
-        return $query->num_rows();
-       
+        return $query->row(); 
     }
+    
 
 
     

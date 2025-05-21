@@ -69,7 +69,9 @@ class EmployeeAttendance extends CI_Model {
                 $rate = $this->extensions->getHolidayTypeRate($holidayInfo["holiday_type"], "teaching");
             }
         }
-    
+
+        $holiday_data = (isset($holidayInfo['type']) && !empty($holidayInfo['type']) ? $holidayInfo['type'] : '');
+
         $dispLogDate = date("d-M (l)",strtotime($date));
 
         $sched = $this->attcompute->displaySched($employeeid,$date);
@@ -405,7 +407,7 @@ class EmployeeAttendance extends CI_Model {
 
                 // GET CURRENT LOG TIME BY SCHEDULE
                 if(!$login ){
-                    $login = $this->timesheet->currentLogtimeAMSchedule($employeeid, $date, $stime, $earlydismissal, $used_time);
+                    $login = $this->timesheet->currentLogtimeAMSchedule($employeeid, $date, $stime, $absent_start, $used_time);
                     if(in_array($login, $used_time)){
                         $login = "";
                     }
@@ -694,14 +696,37 @@ class EmployeeAttendance extends CI_Model {
                 }else{
                     $presentLastLog = false;
                 }
+                
+                if(!empty($holidayInfo) && $holidayInfo['type'] == 'OTHERS'){ // if other holiday, it will automatically set the logs as off time in
+                    $login = date("h:i A",strtotime($off_time_in));
+                    $logout = date("h:i A",strtotime($off_time_out));
+                    $log_remarks = str_replace('NO TIME IN AND OUT', '', $log_remarks);
+                    $log_remarks .= $holidayInfo['description'];
+                    $absent = false;
+                    
+                    // sum the total render and total of absent
+                    $subtotaltpdlec = $this->time->sumTimes([$subtotaltpdlec, $tschedlec]);
+                    $subtotaltpdlab = $this->time->sumTimes([$subtotaltpdlab, $tschedlab]);
+                    $subtotaltpdadmin = $this->time->sumTimes([$subtotaltpdadmin, $tschedadmin]);
+                    $subtotaltpdrle = $this->time->sumTimes([$subtotaltpdrle, $tschedrle]);
+
+                    $subtotaltpdlec = $subtotaltpdlec == "00:00" ? "" : $subtotaltpdlec;
+                    $subtotaltpdlab = $subtotaltpdlab == "00:00" ? "" : $subtotaltpdlab;
+                    $subtotaltpdadmin = $subtotaltpdadmin == "00:00" ? "" : $subtotaltpdadmin;
+                    $subtotaltpdrle = $subtotaltpdrle == "00:00" ? "" : $subtotaltpdrle;
+
+                    // remove the absent total
+                    $tschedlec = "";
+                    $tschedlab = "";
+                    $tschedadmin = "";
+                    $tschedrle = "";
+                }
               
                 $off_lec = $subtotaltpdlec ? $subtotaltpdlec : "";
                 $off_lab = $subtotaltpdlab ? $subtotaltpdlab : "";
                 $off_admin = $subtotaltpdadmin ? $subtotaltpdadmin : "";
                 $off_overload = $subtotaltpdrle ? $subtotaltpdrle : "";
 
-
-            
                 $actlog_time_in = ($login && !$absent ? date("h:i A",strtotime($login)) : "--");
                 $actlog_time_out = ($logout && !$absent ? date("h:i A",strtotime($logout)) : "--");
 
@@ -854,9 +879,6 @@ class EmployeeAttendance extends CI_Model {
                         }
                     }
                 }
-                    
-
-                    
                  
                     $emergency = ($el) ? $el : "";
                     $vacation = ($vl) ? $vl : "";
@@ -994,7 +1016,6 @@ class EmployeeAttendance extends CI_Model {
                 }
        
                 $holiday_type = (isset($holidayInfo['holiday_code']) && $holiday) ?$holidayInfo['holiday_code'] : "";
-
                 
                 /**
                  * Validate if actual log time is within official work hours.
@@ -1070,7 +1091,7 @@ class EmployeeAttendance extends CI_Model {
                         holiday_admin = '$holiday_admin',
                         holiday_overload = '$holiday_overload',
                         lateut_remarks = '$lateut_remarks',
-                        holiday = '$holiday',
+                        holiday = '$holiday_data',
                         emergency = '$emergency',
                         vacation = '$vacation',
                         sick = '$sick',
@@ -1476,7 +1497,6 @@ class EmployeeAttendance extends CI_Model {
                         if(date('H:i:s', strtotime($login)) != $stime && date('H:i:s', strtotime($logout)) != $etime) $login = $logout = "";
                     }
 
-
                     list($otreg,$otrest,$othol) = $this->attcompute->displayOt($employeeid,$date,true, $holiday);
                     if($otreg || $otrest || $othol){
                         $ot_remarks = "OVERTIME APPLICATION";
@@ -1677,44 +1697,75 @@ class EmployeeAttendance extends CI_Model {
                         $tempabsent = $absent;
                     }
 
-                    // GET CURRENT LOG TIME BY SCHEDULE
-                    if(!$login){
-                        $login = $this->timesheet->currentLogtimeAMSchedule($employeeid, $date, $stime, $earlyd, $used_time_no_used);
-                        
-                        if(in_array($login, $used_time_no_used)){
-                            $login = "";
+                    // GET CURRENT LOG TIME BY SCHEDULE (LOGIN)
+                    if (!$login) {
+                        $login = $this->timesheet->currentLogtimeAMSchedule($employeeid, $date, $stime, $absent_start, $used_time_no_used);
+
+                        // NEW: Remove logout if it’s within a short interval (e.g., 5 minute) of login
+                        $min_diff = 5; // minutes
+                        if ($login && $last_login) {
+                            $login_time = strtotime($login);
+                            $last_login_time = strtotime($last_login);
+                            $diff = abs($last_login_time - $login_time) / 60; // difference in minutes
+ 
+                            if ($diff <= $min_diff) {
+                                $login = "";
+                            }
                         }
 
-                        if($last_login == $login || $last_logout == $login){
-                            $login = "";
-                        }
-
-                        if($sched_key == 0 && $login == ""){ // if first schedule don't have login
-                            $schedstart   = strtotime($stime);
+                        // If first schedule and still no login, mark as absent
+                        if ($sched_key == 0 && $login == "") {
+                            $schedstart = strtotime($stime);
                             $schedend   = strtotime($etime);
-                            $totalHoursOfWork = round(abs($schedend - $schedstart) / 60,2);
-                            $absent = date('H:i', mktime(0,$totalHoursOfWork));
+                            $totalMinutes = round(abs($schedend - $schedstart) / 60, 2);
+                            $absent = date('H:i', mktime(0, $totalMinutes));
                         }
                     }
 
-                    // GET CURRENT LOG TIME BY SCHEDULE
-                    if(!$logout ){
-                        $logout = $this->timesheet->currentLogtimePMSchedule($employeeid, $date, $etime, $earlyd, $used_time_no_used, $prior_sched_start, $prior_absent_start);
-                        
-                        // if(in_array($logout, $used_time_no_used)){
-                        //     $logout = "";
-                        // }
+                    // GET CURRENT LOG TIME BY SCHEDULE (LOGOUT)
+                    if (!$logout) {
+                        $logout = $this->timesheet->currentLogtimePMSchedule(
+                            $employeeid, $date, $etime, $earlyd, $used_time_no_used, $prior_sched_start, $prior_absent_start
+                        );
 
-                        if(($last_logout == $logout || $last_login == $logout) || (!$previous_logout && !$login)){
-                            $logout = "";
+                        if($last_logout || $last_login || $previous_logout){
+                            if(($last_logout == $logout || $last_login == $logout) || (!$previous_logout && !$login)){
+                                $logout = "";
+                            }
                         }
 
-                        if(!$login) {
+                        // Use previous logout if no login found
+                        if (!$login) {
                             $login = $previous_logout;
                         }
 
-                        if($logout && ($previous_logout || $login)){
-                            $absent = "";
+                        // If logout exists, clear absence
+                        if ($logout) {
+                            // $absent = ""; REMOVE AS PER MAM MARICRIS
+                        }
+
+                        // Prevent identical login/logout if they are both true
+                        if ($login && $logout && $login === $logout) {
+                            $logout = "";
+                        }
+
+                        // NEW: Remove logout if it’s within a short interval (e.g., 1 minute) of login
+                        $min_diff = 5; // minutes
+                        if ($login && $logout) {
+                            $login_time = strtotime($login);
+                            $logout_time = strtotime($logout);
+                            $diff = abs($logout_time - $login_time) / 60; // difference in minutes
+
+                            if ($diff <= $min_diff) {
+                                $logout = "";
+                            }
+                        }
+                    }
+
+                    // REMOVE LOG IF IT USED ON FIRST SCHEDULE BUT  NOT USABLE IN NEXT SCHEDULE
+                    if($seq > 1){
+                        if (strtotime($stime) > strtotime($logout) && $last_logout == $login) {
+                            $login = "";
                         }
                     }
 
@@ -1806,29 +1857,27 @@ class EmployeeAttendance extends CI_Model {
                     }else if($absent){
                         if(in_array("absent", $ob_data)) $log_remarks = "EXCUSED ABSENT";
                         else{
-                            // if(strtotime($date) < strtotime($date_tmp)){
-                                // $log_remarks = "ABSENT";
-                                $ob_type = false; 
-                                if(!$login && !$logout && !$haslog_forremarks){
-                                    if($last_login && $last_logout){
-                                        $log_remarks = '<span style="color:red">UNDERTIME</span>';
-                                    }else{
-                                        $log_remarks = '<span style="color:red">NO TIME IN AND OUT</span>';
-                                    }
-                                }elseif(!$login) {
-                                    $log_remarks = "<span style='color:red'>LATE</span>";
-                                }elseif(!$logout) {
-                                    $log_remarks = 'NO TIME OUT';
-                                    // $tworkhours = "0:00";
-                                    // }
+                            $ob_type = false; 
+                            if(!$login && !$logout && !$haslog_forremarks){
+                                if($last_login && $last_logout){
+                                    $log_remarks = '<span style="color:red">UNDERTIME</span>';
+                                }else{
+                                    $log_remarks = '<span style="color:red">NO TIME IN AND OUT</span>';
                                 }
+                            }elseif(!$login) {
+                                $log_remarks = "<span style='color:red'>LATE</span>";
+                            }
                         }
                     }
                     
                     // For bypassing remarks, displaying missing logs
-                    // if ($login xor $logout) {
-                    //     $log_remarks = '<span style="color:red">MISSING LOGS</span>';
-                    // }
+                    if ($login xor $logout) {
+                        if (!$login) {
+                            $log_remarks = '<span style="color:red">NO TIME IN</span>';
+                        } elseif (!$logout) {
+                            $log_remarks = '<span style="color:red">NO TIME OUT</span>';
+                        }
+                    }
                     
                     if(!$login){
                         $login = $this->timesheet->getNooutData($employeeid, $date);
@@ -1867,6 +1916,12 @@ class EmployeeAttendance extends CI_Model {
 
                     $late = $lateutlec;
                     $undertime = $utlec;
+
+                    if(!empty($holidayInfo) && $holiday){
+                        $actlog_time_in = $off_time_in;
+                        $actlog_time_out = $off_time_out;
+                        $log_remarks = str_replace('<span style="color:red">NO TIME IN AND OUT</span>', '', $log_remarks);
+                    }
 
                     // COMMENT PO MUNA PARANG ITO CAUSE KAYA NAG DODOBLE PO BAWAS NG LATE SA RENDERED HOURS
                     // if($late){
@@ -1969,8 +2024,8 @@ class EmployeeAttendance extends CI_Model {
                     $remarks .= $sc_app?'USE SERVICE CREDIT<br>':'';
                     $remarks .= $dispLogDate ? (isset($holidayInfo['description']) ? $holidayInfo['description'] : '') : '';
                     
-                    $holiday_data = (isset($holidayInfo['holiday_type']) && !empty($holiday)) ? $holidayInfo['holiday_type'] : '';
-                    $holiday_type = (isset($holidayInfo['type']) && !empty($holiday)) ? $holidayInfo['type'] : '';
+                    $holiday_data = (!empty($holidayInfo['holiday_type']) && !empty($holiday)) ? $holidayInfo['holiday_type'] : '';
+                    $holiday_type = (!empty($holidayInfo['type']) && !empty($holiday)) ? $holidayInfo['type'] : '';
                     
 
                    
@@ -1991,12 +2046,12 @@ class EmployeeAttendance extends CI_Model {
 
                     if(!$late && !$undertime && !$absent_data)
                     {
-                        $twr = $this->attcompute->sec_to_hm(abs($this->attcompute->exp_time($off_time_in) - $this->attcompute->exp_time($off_time_out)));
+                        $twr = $this->attcompute->sec_to_hm($this->time->getSecondsBetweenTimes($off_time_in, $off_time_out));
                     }
                     if($late &&  !$undertime && !$absent_data)
                     {
                         $lateut = $this->attcompute->exp_time($late);
-                        $twr = $this->attcompute->sec_to_hm(abs($this->attcompute->exp_time($off_time_in) - $this->attcompute->exp_time($off_time_out))-$lateut);
+                        $twr = $this->attcompute->sec_to_hm($this->time->getSecondsBetweenTimes($off_time_in, $off_time_out) - $lateut);
                     }
 
 
@@ -2019,6 +2074,9 @@ class EmployeeAttendance extends CI_Model {
                     
                         // Handle case where an upcoming login exists.
                         if ($upcomingLogin) {
+                            $undertime = $absent_data;
+                            $absent_data = '';
+                        }else if($last_login && $last_logout){
                             $late = $absent_data;
                             $absent_data = '';
                         }
@@ -2057,7 +2115,7 @@ class EmployeeAttendance extends CI_Model {
                         }
                     }
 
-                    if($actlog_time_in == '--' && $actlog_time_out == '--')
+                    if($actlog_time_in == '--' || $actlog_time_out == '--')
                     {
                         $twr = "0:00";
                     }
@@ -2177,7 +2235,7 @@ class EmployeeAttendance extends CI_Model {
 
             //Service Credit 
             $service_credit = $this->attcompute->displayServiceCredit($employeeid,$stime,$etime,$date);
-
+            
             $sc_application = $this->attcompute->displaySCAttendance($employeeid,$date, $stime, $etime);
             if($sc_application > 0){
                 if($sc_app_remarks != "Approved Conversion Service Credit"){
@@ -2185,6 +2243,15 @@ class EmployeeAttendance extends CI_Model {
                 }
             }
 
+            // SC APPLICATION 
+            $sc_status = $this->attcompute->getServiceCreditStatus($employeeid, $date);
+            $sc_remarks = ""; 
+            if ($sc_status) { 
+                if ($sc_status->status == "APPROVED") {
+                    $sc_remarks .= ($sc_remarks ? "<br>" : "") . "APPROVED SERVICE CREDIT APPLICATION";
+                }
+            }
+            
             // Leave Pending
             $pending = $this->attcompute->displayPendingApp($employeeid,$date);
 
@@ -2236,6 +2303,7 @@ class EmployeeAttendance extends CI_Model {
                     $remarks .= $ot_remarks;
                     $remarks .= $sc_app_remarks;
                     $remarks .= ($cs_app?$cs_app.'<br>':"");
+                    $remarks .= $sc_remarks && $sc_remarks != '--'? $sc_remarks:'';
                     $remarks .= ($pending)?"PENDING ".$pending.'<br>':($ol ? ($oltype ? ($oltype == "ABSENT" ? "ABSENT W/ FILE<br>" : ($oltype == "CORRECTED TIME IN/OUT" ? ($actlog_time_in != "--" && $actlog_time_out != '--' ? $oltype : '') : $oltype )."<br>") : $this->employeemod->othLeaveDesc($ol)."<br>") 
                         : '');
                     $remarks .= $service_credit && $service_credit != '--'?'SERVICE CREDIT<br>':'';
@@ -2308,10 +2376,11 @@ class EmployeeAttendance extends CI_Model {
                 $remarks .= ($pending) ? "PENDING ".$pending."<br>" : "";
                 $remarks .= ($ol ? ($oltype ? ($oltype == "ABSENT" ? "ABSENT W/ FILE" : $oltype) : $this->employeemod->othLeaveDesc($ol)) : "");
                 $remarks .= $service_credit && $service_credit != '--'?'SERVICE CREDIT<br>':'';
+                $remarks .= $sc_remarks && $sc_remarks != '--'? $sc_remarks:'';
                 $remarks .= (isset($holidayInfo["description"]) ? $holidayInfo["description"] : "");
                 $holiday_data = (isset($holidayInfo['type']) ? $holidayInfo['type'] : '');
                 $holiday_type = (isset($holidayInfo['holiday_type']) && $holiday) ?$holidayInfo['holiday_code'] : "";
-
+                
                 $this->db->query("INSERT INTO employee_attendance_nonteaching
                 SET employeeid = '$employeeid',
                     `date` = '$date',
@@ -2344,8 +2413,8 @@ class EmployeeAttendance extends CI_Model {
     }
 
     public function removeExistingAttendance($employeeid, $date, $teaching = true){
-        if($teaching){
-            $this->db->query("DELETE FROM employee_attendance_nonteaching WHERE employeeid = '$employeeid' AND date = '$date'");
+        if($teaching === true){
+            $this->db->query("DELETE FROM employee_attendance_teaching WHERE employeeid = '$employeeid' AND date = '$date'");
         }else{
             $this->db->query("DELETE FROM employee_attendance_nonteaching WHERE employeeid = '$employeeid' AND date = '$date'");
         }

@@ -46,9 +46,6 @@ class ReportManager
 
         // Prepare date range
         $data["actual_dates"] = [$det->dfrom, $det->dto];
-        $dates = $this->time->generateMonthDates($det->dfrom);
-        // $det->dfrom = $dates["first_date"];
-        // $det->dto = $dates["last_date"];
         
         // Fetch employees for the report
         $employeelist = $this->worker_model->getEmployeeList($det->where_clause, $worker_id, $det->id);
