@@ -129,7 +129,7 @@ class AttendanceManager
 					$this->api->update_calculate_status($filter);
 					$response = "done";
 
-					echo $response;die;
+					// echo $response;die;
 
 				}
 				
