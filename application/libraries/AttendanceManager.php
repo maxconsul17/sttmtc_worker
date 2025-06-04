@@ -495,8 +495,8 @@ class AttendanceManager
             			t_overload = '$teaching_overload_total'");
 
 					// echo "<pre>";print_r($this->CI->db->last_query());echo "<pre>";
-            		if($res) $base_id = $this->CI->db->insert_id();
-
+            		// if($res) $base_id = $this->CI->db->insert_id();
+					$base_id = "";
 	                foreach ($workhours_arr as $aimsdept => $classification_arr) {
 	                    foreach ($classification_arr as $classification => $leclab_arr) {
 	                    	foreach ($leclab_arr as $type => $sec) {
@@ -714,7 +714,8 @@ class AttendanceManager
 						total_ot_without_25 = '$totalOTWithout25Formatted'");
 					// echo "<pre>";print_r($this->CI->db->last_query());
             		if($res){
-            			$base_id = $this->CI->db->insert_id();
+            			// $base_id = $this->CI->db->insert_id();
+						$base_id = "";
             			foreach ($workhours_arr as $aimsdept => $leclab_arr) {
 		                    foreach ($leclab_arr as $type => $sec) {
 		                    	$work_hours = $this->attcompute->sec_to_hm($sec['work_hours']);
