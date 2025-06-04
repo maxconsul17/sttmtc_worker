@@ -1020,13 +1020,14 @@ class EmployeeAttendance extends CI_Model {
                 /**
                  * Validate if actual log time is within official work hours.
                  */
-                if ($this->validateLogTimeWithinWorkSchedule($off_time_out, $actlog_time_out)) {
-                    if(!$lateut_lec)
-                    {
-                        $actlog_time_in = $actlog_time_out = '--';
-                    }
-                }
-
+                // if ($this->validateLogTimeWithinWorkSchedule($off_time_out, $actlog_time_out)) {
+                //     if(!$lateut_lec)
+                //     {
+                //         $actlog_time_in = $actlog_time_out = '--';
+                //     }
+                // }
+                // COMMENTED BY MAX para sa ticket na to https://jira.pinnacle.edu.ph/browse/STMTCCHYP-1195
+                
                 // Categories for processing
                 $categories = [
                     'lec' => ['absent' => $absent_lec, 'off' => $off_lec, 'lateut' => $lateut_lec],
@@ -1386,6 +1387,7 @@ class EmployeeAttendance extends CI_Model {
         // Holiday
         $isSuspension = false;
         $isRegularHoliday = false;
+        $otherHoliday = false;
         $last_login = $last_logout = "";
         $last_stime = $last_etime = "";
         $campus_tap = $this->attendance->getTapCampus($employeeid, $date);
@@ -1401,6 +1403,7 @@ class EmployeeAttendance extends CI_Model {
                 $holiday_type = $holidayInfo['holiday_type'];
                 if($holidayInfo['holiday_type']==1) $isRegularHoliday = true;
                 if($holidayInfo['holiday_type']==3) $isSuspension = true;
+                if($holidayInfo['type']=='OTHERS') $otherHoliday = true;
                 $rate = $this->extensions->getHolidayTypeRate($holidayInfo["holiday_type"], "nonteaching");
             }
         }
@@ -1410,6 +1413,23 @@ class EmployeeAttendance extends CI_Model {
         //     $holidayInfo = array();
         //     $holiday = "";
         // }
+        
+        // VALIDATE IF HAS LOG BEFORE THE DAY OF HOLIDAY
+        $before_holiday_log = $this->checkEmployeeLog($employeeid, $date);
+        if($holiday){
+            // var_dump($otherHoliday); die;
+            if($otherHoliday === false){
+                if($before_holiday_log === 0){
+                    $holiday = "";
+                    $holiday_type = "";
+                    $rate = "";
+                    $isRegularHoliday = false;
+                    $isSuspension = false;
+                    $otherHoliday = false;
+                    $holidayInfo = array();
+                }
+            }
+        }
 
         $dispLogDate = date("d-M (l)",strtotime($date));
         $sched = $this->attcompute->displaySched($employeeid,$date);
@@ -1669,7 +1689,7 @@ class EmployeeAttendance extends CI_Model {
                     }
                     $log_remarks = '';
                     
-                    if($isRegularHoliday){
+                    if($otherHoliday){
                         $login = $stime;
                         $logout = $etime;
                     }
@@ -1858,14 +1878,12 @@ class EmployeeAttendance extends CI_Model {
                         if(in_array("absent", $ob_data)) $log_remarks = "EXCUSED ABSENT";
                         else{
                             $ob_type = false; 
-                            if(!$login && !$logout && !$haslog_forremarks){
+                            if(!$login && !$logout){
                                 if($last_login && $last_logout){
                                     $log_remarks = '<span style="color:red">UNDERTIME</span>';
                                 }else{
                                     $log_remarks = '<span style="color:red">NO TIME IN AND OUT</span>';
                                 }
-                            }elseif(!$login) {
-                                $log_remarks = "<span style='color:red'>LATE</span>";
                             }
                         }
                     }
@@ -2910,6 +2928,46 @@ class EmployeeAttendance extends CI_Model {
             WHERE 1 = 1 $where
             ORDER BY fullname ASC")->num_rows();
     }
+
+    /**
+     * Check if the employee has any log entry on the last scheduled day before the given date,
+     * looking back up to 5 days.
+     *
+     * @param string $employee_id The ID of the employee.
+     * @param string $date        The date in 'Y-m-d' format.
+     *
+     * @return int The number of log records found for the employee on the last scheduled day before the given date.
+     */
+    public function checkEmployeeLog($employee_id, $date) {
+        $look_back_limit = 5;
+        $days_checked = 0;
+
+        // Start with the day before the given date
+        $previous_date = date('Y-m-d', strtotime($date . ' -1 day'));
+
+        while ($days_checked < $look_back_limit) {
+            $sched = $this->attcompute->displaySched($employee_id, $previous_date);
+
+            if ($sched && $sched->num_rows() > 0) {
+                // Found a scheduled day, check for logs
+                return $this->db->query("
+                    SELECT id 
+                    FROM facial_Log 
+                    WHERE employeeid = '$employee_id' 
+                    AND DATE(FROM_UNIXTIME(FLOOR(TIME/1000))) = '$previous_date'
+                ")->num_rows();
+            }
+
+            // Move back one more day
+            $previous_date = date('Y-m-d', strtotime($previous_date . ' -1 day'));
+            $days_checked++;
+        }
+
+        // No scheduled day found within the look-back limit
+        return 0;
+    }
+
+    
 }
 /* End of file employee.php */
 /* Location: ./application/models/employee.php */
