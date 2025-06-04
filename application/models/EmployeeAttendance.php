@@ -1426,7 +1426,7 @@ class EmployeeAttendance extends CI_Model {
                     $isRegularHoliday = false;
                     $isSuspension = false;
                     $otherHoliday = false;
-                    $holidayInfo = array();
+                    // $holidayInfo = array();
                 }
             }
         }
