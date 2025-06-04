@@ -45,10 +45,10 @@ class Worker extends WorkerController
         //     return false;
         // }
 
-        if($getReportJob){
-            $this->report_manager->processReport($getReportJob, $worker_id);
-            return false;
-        }
+        // if($getReportJob){
+        //     $this->report_manager->processReport($getReportJob, $worker_id);
+        //     return false;
+        // }
         if($getRecomputeJob){
             $this->recompute_manager->processRecompute($getRecomputeJob, $worker_id);
             return false;
