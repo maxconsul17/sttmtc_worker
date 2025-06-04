@@ -35,28 +35,28 @@ class Worker extends WorkerController
         $getFacialJob = $this->facial_manager->getFacialJob();
         $getFailedFacialJob = $this->facial_manager->getFailedFacialJob();
 
-        // if($getCalculateJob){
-        //     $this->attendance_manager->processCalculation($getCalculateJob, $worker_id);
-        //     return false;
-        // }
+        if($getCalculateJob){
+            $this->attendance_manager->processCalculation($getCalculateJob, $worker_id);
+            return false;
+        }
 
-        // if($getAttendanceJob){
-        //     $this->attendance_manager->processAttendance($getAttendanceJob, $worker_id);
-        //     return false;
-        // }
+        if($getAttendanceJob){
+            $this->attendance_manager->processAttendance($getAttendanceJob, $worker_id);
+            return false;
+        }
 
-        // if($getReportJob){
-        //     $this->report_manager->processReport($getReportJob, $worker_id);
-        //     return false;
-        // }
-        // if($getRecomputeJob){
-        //     $this->recompute_manager->processRecompute($getRecomputeJob, $worker_id);
-        //     return false;
-        // }
-        // if($getPayrollJob){
-        //     $this->payroll_manager->processPayroll($getPayrollJob, $worker_id);
-        //     return false;
-        // }
+        if($getReportJob){
+            $this->report_manager->processReport($getReportJob, $worker_id);
+            return false;
+        }
+        if($getRecomputeJob){
+            $this->recompute_manager->processRecompute($getRecomputeJob, $worker_id);
+            return false;
+        }
+        if($getPayrollJob){
+            $this->payroll_manager->processPayroll($getPayrollJob, $worker_id);
+            return false;
+        }
         if($getFacialJob){
             $this->facial_manager->processFacial($getFacialJob, $worker_id);
             return false;

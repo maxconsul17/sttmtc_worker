@@ -84,7 +84,7 @@ class AttendanceManager
 
     public function processCalculation($job, $worker_id){
         // $emp_list = $this->worker_model->fetch_emp_calculate();  // Fetch list of employees with attendance tasks
-		if($worker_id == 4){
+		if($worker_id == 3){
 			try{
 				$row = get_object_vars($job);
 				$this->worker_model->update_calculate_status($row, "ongoing");
