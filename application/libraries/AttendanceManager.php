@@ -319,7 +319,7 @@ class AttendanceManager
 		                $holiday_overload_total += $this->attcompute->exp_time($value->holiday_overload);
 
 						if(($value->holiday || !empty($value->holiday_type))&& $counter == 0 ){
-							if($value->holiday_type != 'OTHERS') {
+							if($value->holiday_type != 'OTHERS' && $value->absent == "") {
 								$isHoliday= true;
 								$holiday_total++;
 							}
@@ -571,9 +571,11 @@ class AttendanceManager
 									$suspension_total++;
 									$total_suspension += $this->attcompute->exp_time($value->twr);
 								} else {
-									$holiday_total++;
-									$isHoliday = true; 
-									$total_holiday += $this->attcompute->exp_time($value->twr);
+									if($value->absent == ""){
+										$holiday_total++;
+										$isHoliday = true; 
+										$total_holiday += $this->attcompute->exp_time($value->twr);
+									}
 								}
 							}
 							
