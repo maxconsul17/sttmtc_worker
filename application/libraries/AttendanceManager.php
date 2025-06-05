@@ -183,6 +183,7 @@ class AttendanceManager
 		            $counter = 0;
 		            $rowspan = 0;
 		            $is_absent = 0;
+					$isHoliday= false;
 		            $date = $daily_lec = $daily_lab = $daily_admin = $daily_overload = $daily_overtime_mode =  "";
 		            $daily_lec_absent = $daily_lab_absent = $daily_admin_absent = $daily_overload_absent = $daily_lec_late = $daily_lab_late = $daily_admin_late = $daily_overload_late = $daily_lec_undertime = $daily_lab_undertime = $daily_admin_undertime = $daily_overload_undertime = $daily_overtime = $daily_undertime = $daily_late = $daily_absents = $daily_overtime_amount =  0;
 		            $ot_list = array();
@@ -271,7 +272,12 @@ class AttendanceManager
 		                $holiday_admin_total += $this->attcompute->exp_time($value->holiday_admin);
 		                $holiday_overload_total += $this->attcompute->exp_time($value->holiday_overload);
 
-		                if($value->holiday && $counter == 0) $holiday_total++;
+						if(($value->holiday || !empty($value->holiday_type))&& $counter == 0 ){
+							if($value->holiday_type != 'OTHERS') {
+								$isHoliday= true;
+								$holiday_total++;
+							}
+						}
 
 		                if($value->absent_lec && $this->time->hoursToMinutes($value->absent_lec) > 0) $is_absent++;
 		                else if($value->absent_lab && $this->time->hoursToMinutes($value->absent_lab) > 0) $is_absent++;
@@ -321,7 +327,9 @@ class AttendanceManager
 		                		if(!$isnodtr) $daily_absents += $this->attcompute->exp_time($value->absent_admin);
 		                		$daily_admin .= "work_hours"."=".$this->attcompute->exp_time($value->off_admin)."/late_hours=".(!$isnodtr && $value->lateut_admin ? $value->lateut_admin : 0)."/deduc_hours=".(!$isnodtr && $value->absent_admin ? $value->absent_admin : 0)."/aimsdept=".$value->aims_dept."/suspension=/classification_id=".$value->classification_id;
 
-		                		if(!isset($workhours_arr[$value->aims_dept][$value->classification_id]['ADMIN']['work_hours'])) $workhours_arr[$value->aims_dept][$value->classification_id]['ADMIN']['work_hours'] = 0;
+		                		if(!$isHoliday){
+									if(!isset($workhours_arr[$value->aims_dept][$value->classification_id]['ADMIN']['work_hours'])) $workhours_arr[$value->aims_dept][$value->classification_id]['ADMIN']['work_hours'] = 0;
+								}
 						        if(!isset($workhours_arr[$value->aims_dept][$value->classification_id]['ADMIN']['late_hours'])) $workhours_arr[$value->aims_dept][$value->classification_id]['ADMIN']['late_hours'] = 0;
 						        if(!isset($workhours_arr[$value->aims_dept][$value->classification_id]['ADMIN']['deduc_hours'])) $workhours_arr[$value->aims_dept][$value->classification_id]['ADMIN']['deduc_hours'] = 0;
 						        if(!isset($workhours_arr[$value->aims_dept][$value->classification_id]['ADMIN']['leave_project'])) $workhours_arr[$value->aims_dept][$value->classification_id]['ADMIN']['leave_project'] = 0;
@@ -488,6 +496,7 @@ class AttendanceManager
 					$rowspan = 0;
 					$is_absent = 0;
 					$date = $daily_overtime_mode = "";
+					$isHoliday = false;
 					$ot_list = array();
 					foreach ($att_date as $key => $value) {
 						$date = $value->date;
@@ -511,12 +520,13 @@ class AttendanceManager
 
 							$daily_overtime += $this->attcompute->exp_time($value->ot_holiday) + $this->attcompute->exp_time($value->ot_restday) + $this->attcompute->exp_time($value->ot_regular);
 							
-							if (!empty($value->holiday)) { 
+							if (!empty($value->holiday) || !empty($value->holiday_type)) { 
 								if ($value->holiday == 3 || $value->holiday == '3') { 
 									$suspension_total++;
 									$total_suspension += $this->attcompute->exp_time($value->twr);
 								} else {
 									$holiday_total++;
+									$isHoliday = true; 
 									$total_holiday += $this->attcompute->exp_time($value->twr);
 								}
 							}
@@ -562,7 +572,10 @@ class AttendanceManager
 							$total_late_deduc = $this->attcompute->sec_to_hm($late_deduc);
 						}
 
-				        $workhours_arr['']['ADMIN']['work_hours'] += $this->attcompute->exp_time($value->off_time_total);
+				       // dont include add the twr when holiday is true
+						if(!$isHoliday){
+							$workhours_arr['']['ADMIN']['work_hours'] += $this->attcompute->exp_time($value->twr);
+						} 
 			            $workhours_arr['']['ADMIN']['late_hours'] += $this->attcompute->exp_time($value->late) + $this->attcompute->exp_time($value->undertime);
 			            $workhours_arr['']['ADMIN']['deduc_hours'] += $this->attcompute->exp_time($value->absent);
 			            $workhours_arr['']['ADMIN']['leave_project'] += $leave_project;
