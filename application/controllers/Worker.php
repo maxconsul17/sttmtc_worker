@@ -33,9 +33,10 @@ class Worker extends WorkerController
         $getPayrollJob = $this->payroll_manager->getPayrollJob();
         $getAttendanceJob = $this->attendance_manager->getAttendanceJob();
         $getFacialJob = $this->facial_manager->getFacialJob();
+        $getFailedFacialJob = $this->facial_manager->getFailedFacialJob();
 
         if($getCalculateJob){
-            $this->attendance_manager->processCalculation($getCalculateJob);
+            $this->attendance_manager->processCalculation($getCalculateJob, $worker_id);
             return false;
         }
 
@@ -60,6 +61,10 @@ class Worker extends WorkerController
             $this->facial_manager->processFacial($getFacialJob, $worker_id);
             return false;
         }
+        if($getFailedFacialJob){
+            $this->facial_manager->processFailedFacial($getFailedFacialJob, $worker_id);
+            return false;
+        }
         
         return false;
     }
@@ -72,6 +77,7 @@ class Worker extends WorkerController
         $getCalculateJob = $this->attendance_manager->getCalculateJob();
         $getAttendanceJob = $this->attendance_manager->getAttendanceJob();
         $getFacialJob = $this->facial_manager->getFacialJob();
+        $getFailedFacialJob = $this->facial_manager->getFailedFacialJob();
 
         if($getCalculateJob) return true;
         if($getAttendanceJob) return true;
@@ -79,6 +85,7 @@ class Worker extends WorkerController
         if($getRecomputeJob) return true;
         if($getPayrollJob) return true;
         if($getFacialJob) return true;
+        if($getFailedFacialJob) return true;
 
         return false;
 

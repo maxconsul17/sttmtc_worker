@@ -105,11 +105,11 @@ class Attendance extends CI_Model {
         }
         
         if($tnt){
-            if($tnt != "trelated") $wC .= " AND a.teachingtype = '$tnt' AND a.trelated != '1' ";
+            if($tnt != "trelated") $wC .= " AND a.teachingtype = '$tnt'";
             else $wC .= " AND a.teachingtype='teaching' AND a.trelated = '1'";
         }
 
-        if($employeeid) $wC .= " AND a.employeeid='$employeeid'";
+        if($employeeid && $employeeid != 'all') $wC .= " AND a.employeeid='$employeeid'";
         if($deptid) $wC .= " AND a.deptid='$deptid'";
         if($campus && $campus!="All") $wC .= " AND a.campusid='$campus'";
         if($payroll_start && $payroll_end) $ifPayrollProcess = " AND a.employeeid NOT IN (SELECT employeeid FROM payroll_computed_table c WHERE a.employeeid = c.employeeid AND c.cutoffstart = '$payroll_start' AND cutoffend = '$payroll_end' AND status = 'PROCESSED' ) ";
@@ -128,7 +128,6 @@ class Attendance extends CI_Model {
         // Add this condition for restricting not main site
         $main_campus = $this->db->campus_code;
         $wC .= " AND a.campusid = '$main_campus'";
-
         $wC .= $utwc;
         $this->attSummQuery = "
             SELECT a.employeeid as qEmpId,office as qDeptId, CONCAT(lname,', ',fname,' ',mname) AS qFullname, b.description AS qDepartment, a.dateresigned2
@@ -158,11 +157,11 @@ class Attendance extends CI_Model {
         }
         
         if($tnt){
-            if($tnt != "trelated") $wC .= " AND a.teachingtype = '$tnt' AND a.trelated != '1' ";
+            if($tnt != "trelated") $wC .= " AND a.teachingtype = '$tnt'";
             else $wC .= " AND a.teachingtype='teaching' AND a.trelated = '1'";
         }
 
-        if($employeeid) $wC .= " AND a.employeeid='$employeeid'";
+        if($employeeid && $employeeid != 'all') $wC .= " AND a.employeeid='$employeeid'";
         if($schedule) $wC .= " AND d.schedule='$schedule'";
         if($deptid) $wC .= " AND a.deptid='$deptid'";
         if($campus && $campus!="All") $wC .= " AND a.campusid='$campus'";
@@ -182,6 +181,7 @@ class Attendance extends CI_Model {
         // Add this condition for restricting not main site
         $main_campus = $this->db->campus_code;
         $wC .= " AND a.campusid = '$main_campus'";
+        $wC .= " AND a.employeeid IN (SELECT employeeid FROM employee_schedule_history)";
 
         $wC .= $utwc;
         $this->attSummQuery = "
@@ -275,10 +275,10 @@ class Attendance extends CI_Model {
             $wC .= " AND a.teachingtype = '$tnt' ";
         }
       
-        if($employeeid) $wC .= " AND a.employeeid='$employeeid'";
+        if($employeeid && $employeeid != 'all') $wC .= " AND a.employeeid='$employeeid'";
         if($schedule) $wC .= " AND d.schedule='$schedule'";
         if($deptid) $wC .= " AND a.deptid='$deptid'";
-        if($campus && $campus!="All") $wC .= " AND a.campusid='$campus'";
+        // if($campus && $campus!="All") $wC .= " AND a.campusid='$campus'";
         if($payroll_start && $payroll_end) $ifPayrollProcess = " AND a.employeeid NOT IN (SELECT employeeid FROM payroll_computed_table c WHERE a.employeeid = c.employeeid AND c.cutoffstart = '$payroll_start' AND cutoffend = '$payroll_end' AND status = 'PROCESSED' ) ";
         $utwc = '';
         $utdept = $this->session->userdata("department");
@@ -295,7 +295,8 @@ class Attendance extends CI_Model {
         // Add this condition for restricting not main site
         $main_campus = $this->db->campus_code;
         $wC .= " AND a.campusid = '$main_campus'";
-
+        // condition that will check if the employee has existing schedule - rys
+        $wC .= " AND a.employeeid IN (SELECT employeeid FROM employee_schedule_history)";
         $wC .= $utwc;
         $this->attSummQuery = " SELECT  d.schedule, a.employeeid as qEmpId,office as qDeptId, CONCAT(lname,', ',fname,' ',mname) AS qFullname, b.description AS  qDepartment, a.dateresigned2 FROM employee a
                       LEFT JOIN code_office b ON a.office = b.code 
@@ -305,7 +306,9 @@ class Attendance extends CI_Model {
                       AND a.employeeid NOT IN (SELECT employeeid FROM attendance_confirmed_nt c 
                       WHERE a.employeeid = c.employeeid AND c.cutoffstart = '$dfrom' AND cutoffend = '$dto' ) $ifPayrollProcess
                      $wC
-                    GROUP BY a.employeeid ORDER BY b.description, qFullname";                
+                    GROUP BY a.employeeid ORDER BY b.description, qFullname";  
+                    
+            
         return $this->db->query($this->attSummQuery)->result_array();
     }
     public function emp_confirmed($dfrom="", $dto="", $tnt="", $eid="", $campus="", $deptid="", $sDept = "", $company_campus="", $office="", $isactive=""){
@@ -331,7 +334,7 @@ class Attendance extends CI_Model {
         }
 
         if($tnt){
-            if($tnt != "trelated") $wC .= " AND a.teachingtype = '$tnt' AND a.trelated != '1' ";
+            if($tnt != "trelated") $wC .= " AND a.teachingtype = '$tnt'";
             else $wC .= " AND a.teachingtype='teaching' AND a.trelated = '1'";
         }
 
@@ -386,7 +389,7 @@ class Attendance extends CI_Model {
         }
 
         if($tnt){
-            if($tnt != "trelated") $wC .= " AND a.teachingtype = '$tnt' AND a.trelated != '1' ";
+            if($tnt != "trelated") $wC .= " AND a.teachingtype = '$tnt'";
             else $wC .= " AND a.teachingtype='teaching' AND a.trelated = '1'";
         }
 
@@ -395,6 +398,8 @@ class Attendance extends CI_Model {
         // if($dept_select && $dept_select != "all") $wC .= " AND a.deptid='$dept_select'";   
         if($sDept) $oB = " b.description,qFullname";    
         // echo "<pre>";print_r($wC);die;
+         // condition that will check if the employee has existing schedule - rys
+        $wC .= " AND a.employeeid IN (SELECT employeeid FROM employee_schedule)";
         $utwc = '';
         $utdept = $this->session->userdata("department");
         $utoffice = $this->session->userdata("office");
@@ -479,7 +484,7 @@ class Attendance extends CI_Model {
         $wC .= $utwc;
         if($xtra_wc==1) $xtra_wc = "";
         $this->attSummQuery = "
-            SELECT a.employeeid as qEmpId,office as qDeptId, CONCAT(lname,', ',fname,' ',mname) AS qFullname, b.description AS qDepartment, a.campusid as qCampusId,DATE(c.timestamp) as dateconfirmed, c.*,d.fixedday, c.status, c.isFinal, c.hold_status, a.dateresigned2
+            SELECT a.employeeid as qEmpId,office as qDeptId, CONCAT(lname,', ',fname,' ',mname) AS qFullname, b.description AS qDepartment, a.campusid as qCampusId,DATE(c.timestamp) as dateconfirmed, c.*,d.fixedday, c.status, c.isFinal, c.hold_status,c.total_ot_with_25,c.total_ot_without_25, a.dateresigned2
                 FROM employee a
                 LEFT JOIN code_office b ON a.office = b.code 
                 INNER JOIN attendance_confirmed_nt c ON a.employeeid = c.employeeid
@@ -528,6 +533,8 @@ class Attendance extends CI_Model {
           $usercampus =  $this->extras->getCampusUser();
           if($usercampus) $utwc .= " AND FIND_IN_SET (a.campusid,'$usercampus') ";
         }
+        // condition that will check if the employee has existing schedule - rys
+        $wC .= " AND a.employeeid IN (SELECT employeeid FROM employee_schedule_history)";
         $wC .= $utwc;
         if($xtra_wc==1) $xtra_wc = "";
         $this->attSummQuery = "
@@ -2856,7 +2863,6 @@ class Attendance extends CI_Model {
                                                 WHERE user_id = '$userid'
                                                   AND DATE(datecreated) = '$datecreated'
                                                   AND b.isactive = '1'
-                                                  AND b.campusid = 'TMS'
                                                 HAVING COUNT(*) > 0 ORDER BY fullname,datecreated DESC;");
                 if($secondquery->num_rows() > 0){
                     array_push($dataArr ,$secondquery->row(0));
@@ -2886,7 +2892,7 @@ class Attendance extends CI_Model {
         
         $conditions = [];
 
-        if ($campusid && $campusid != 'All') $conditions[] = "e.campusid = '$campusid'";
+        // if ($campusid && $campusid != 'All') $conditions[] = "e.campusid = '$campusid'";
         if ($office) $conditions[] = "e.office = '$office'";
         if ($teachingtype) $conditions[] = "e.teachingtype = '$teachingtype'";
         if ($isactive) $conditions[] = "e.isactive = '$isactive'";
@@ -3071,6 +3077,73 @@ class Attendance extends CI_Model {
         return '';
     }
 
+    public function loadLates($employeeId, $date, $tableName)
+    {
+        // Use parameterized queries to prevent SQL injection
+        $query = $this->db->query("
+            SELECT SEC_TO_TIME(SUM(TIME_TO_SEC(late))) AS totalLate
+            FROM {$tableName}
+            WHERE employeeid = ? AND DATE = ?
+        ", [$employeeId, $date]);
+    
+        // Fetch and return the result as a string
+        $result = $query->row();
+        
+        // Check if the result exists and format it
+        if (isset($result->totalLate)) {
+            // Remove the seconds part from the result (HH:MM:SS format)
+            $time = explode(":", $result->totalLate); 
+            return $time[0] . ":" . $time[1]; // Return hours and minutes
+        }
+
+        // Return '00:00' if no result is found
+        return '00:00';
+    }
+
+    public function updateTotalOT($total,$employeeid,$date,$columnName)
+    {
+        if (!empty($total)) {
+            // Update only the specific column if total is provided
+            $this->db->query("
+                UPDATE employee_attendance_nonteaching 
+                SET $columnName = ? 
+                WHERE employeeid = ? AND date = ?
+            ", [$total, $employeeid, $date]);
+        } else {
+            // If total is empty, update all relevant columns to be empty
+            $this->db->query("
+                UPDATE employee_attendance_nonteaching 
+                SET $columnName = ''  -- Replace with actual column names
+                WHERE employeeid = ? AND date = ?
+            ", [$employeeid, $date]);
+        }        
+        
+    }
+
+    public function loadTotalOTPerDate($employeeId,$date,$columnName)
+    {
+        // Use parameterized queries to prevent SQL injection
+        $query = $this->db->query("
+            SELECT {$columnName}
+            FROM employee_attendance_nonteaching
+            WHERE employeeid = ? AND DATE = ? LIMIT 1
+        ", [$employeeId, $date]);
+    
+        // Fetch and return the result as a string
+        $result = $query->row();
+        
+        // Check if the column exists and is not NULL
+        if (!empty($result->$columnName)) {
+            // Remove seconds (HH:MM:SS → HH:MM)
+            $timeParts = explode(":", $result->$columnName);
+            return $timeParts[0] . ":" . $timeParts[1]; // Return HH:MM
+        }
+
+
+        // Return '00:00' if no result is found
+        return '00:00';
+    }
+
 
     public function loadTotalOT($employeeId, $startDate,$endDate,$columnName)
     {
@@ -3100,31 +3173,9 @@ class Attendance extends CI_Model {
         return '00:00';
     }
 
+
     
-    public function loadTotalOTPerDate($employeeId,$date,$columnName)
-    {
-        // Use parameterized queries to prevent SQL injection
-        $query = $this->db->query("
-            SELECT {$columnName}
-            FROM employee_attendance_nonteaching
-            WHERE employeeid = ? AND DATE = ? LIMIT 1
-        ", [$employeeId, $date]);
     
-        // Fetch and return the result as a string
-        $result = $query->row();
-        
-        // Check if the column exists and is not NULL
-        if (!empty($result->$columnName)) {
-            // Remove seconds (HH:MM:SS → HH:MM)
-            $timeParts = explode(":", $result->$columnName);
-            return $timeParts[0] . ":" . $timeParts[1]; // Return HH:MM
-        }
-
-
-        // Return '00:00' if no result is found
-        return '00:00';
-    }
-
 
 }
 // EOF...

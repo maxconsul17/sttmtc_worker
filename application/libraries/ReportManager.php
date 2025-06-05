@@ -42,12 +42,10 @@ class ReportManager
     // Process the DTR report for a given report task
     public function process_dtr($det, $worker_id){
         $this->worker_model->updateReportStatus($det->id, "", "ongoing");
+        if ($det->total_tasks == "0") $this->worker_model->updateReportStatus($det->id, "", "No employee to generate");
 
         // Prepare date range
         $data["actual_dates"] = [$det->dfrom, $det->dto];
-        $dates = $this->time->generateMonthDates($det->dfrom);
-        // $det->dfrom = $dates["first_date"];
-        // $det->dto = $dates["last_date"];
         
         // Fetch employees for the report
         $employeelist = $this->worker_model->getEmployeeList($det->where_clause, $worker_id, $det->id);

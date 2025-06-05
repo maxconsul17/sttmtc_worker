@@ -12,6 +12,7 @@ class FacialManager
         $this->CI = & get_instance();
         $this->CI->load->model("Worker_model", "worker_model");
         $this->CI->load->model("Time", "time");
+        $this->CI->load->database();
         $this->worker_model = $this->CI->worker_model;
         $this->time = $this->CI->time;
     }
@@ -26,9 +27,20 @@ class FacialManager
         if ($facialJob->worker_id == $worker_id) $this->process_facial($facialJob, $worker_id);
     }
 
+    public function processFailedFacial($facialJob, $worker_id){
+
+        if ($facialJob->worker_id == $worker_id){
+            $this->worker_model->retryFacial($facialJob->id);
+        }
+    }
+
     public function getFacialJob()
     {
         return $this->worker_model->getFacialJob();
+    }
+    public function getFailedFacialJob()
+    {
+        return $this->worker_model->getFailedFacialJob();
     }
 
     // Process the DTR report for a given report task
@@ -65,12 +77,14 @@ class FacialManager
 
                 if($err === ""){
                     $trail = array(
-                        "details" => json_encode($det->body),
+                        "details" => $det->body,
+                        "endpoint" => $endpoint,
                         "status" => "success"
                     );
                 }else{
                     $trail = array(
-                        "details" => json_encode($det->body),
+                        "details" => $det->body,
+                        "endpoint" => $endpoint,
                         "status" => "has curl error"
                     );
                 }
@@ -85,7 +99,7 @@ class FacialManager
                 "status" => "has code error"
             );
 
-            $this->db->insert("transfer_logs_trail", $trail);
+            $this->CI->db->insert("transfer_logs_trail", $trail);
         }
         $this->worker_model->updateFacialStatus($det->id,"done");
     }

@@ -1647,8 +1647,8 @@ return  $msg;
 }
 
 function getindividualdept($eid = ""){
-  $query = $this->db->query("SELECT office FROM employee WHERE employeeid='$eid' ");
-  if($query->num_rows() > 0) return Globals::_e($query->row(0)->office);
+  $query = $this->db->query("SELECT deptid FROM employee WHERE employeeid='$eid' ");
+  if($query->num_rows() > 0) return Globals::_e($query->row(0)->deptid);
   else return false;
 }
 

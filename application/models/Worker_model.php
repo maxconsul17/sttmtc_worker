@@ -220,6 +220,9 @@ class Worker_model extends CI_Model {
     public function updateFacialStatus($id, $status="done"){
         $this->db->where("id", $id);
         $this->db->set("status", $status);
+        if($status == 'ongoing'){
+            $this->db->set("try", 'try - 1', FALSE);
+        }
         if($status == "done"){
             $this->db->set("done_time", $this->getServerTime());
         }
@@ -265,6 +268,12 @@ class Worker_model extends CI_Model {
             $this->db->set("try", 'try - 1', FALSE);
         }
 		$this->db->update("employee_to_calculate");
+	}
+    public function retryFacial($id, $count="3"){
+		$this->db->where("id", $id);
+		$this->db->set("status", 'pending');
+        $this->db->set("try", $count, FALSE);
+		$this->db->update("facial_log_que");
 	}
 
     public function stuck_report_list(){
@@ -334,15 +343,24 @@ class Worker_model extends CI_Model {
         return $result ? $result : false;
     }
 
+    public function getFailedFacialJob(){
+        $three_days_ago = date('Y-m-d H:i:s', strtotime('-1 days'));
+        $result = $this->db->where("(status != 'done') AND try = 0 AND timestamp <= '$three_days_ago'")
+            ->get($this->tables[5])
+            ->row();
+        return $result ? $result : false;
+    }
+
     public function updateReportBreakdown($report_status, $report_breakdown_id, $report_id) {
+        $this->worker_model->forTrail("123s");
         // Update report_breakdown status
         $this->db->where("id", $report_breakdown_id)
                  ->set("status", $report_status)
                  ->update("report_breakdown");
-    
+                 $this->worker_model->forTrail("heress");
         // Increment completed_tasks in report_list
         $this->db->query("UPDATE report_list SET completed_tasks = completed_tasks + 1 WHERE id = '$report_id'");
-    
+        $this->worker_model->forTrail("heressss");
         // Update report_list status if completed_tasks = total_tasks
         $this->db->set("status", "done")
                  ->set("done_time", $this->getServerTime())
