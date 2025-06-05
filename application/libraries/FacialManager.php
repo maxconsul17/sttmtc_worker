@@ -78,11 +78,13 @@ class FacialManager
                 if($err === ""){
                     $trail = array(
                         "details" => $det->body,
+                        "endpoint" => $endpoint,
                         "status" => "success"
                     );
                 }else{
                     $trail = array(
                         "details" => $det->body,
+                        "endpoint" => $endpoint,
                         "status" => "has curl error"
                     );
                 }
