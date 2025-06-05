@@ -12,6 +12,7 @@ class FacialManager
         $this->CI = & get_instance();
         $this->CI->load->model("Worker_model", "worker_model");
         $this->CI->load->model("Time", "time");
+        $this->CI->load->database();
         $this->worker_model = $this->CI->worker_model;
         $this->time = $this->CI->time;
     }
@@ -96,7 +97,7 @@ class FacialManager
                 "status" => "has code error"
             );
 
-            $this->db->insert("transfer_logs_trail", $trail);
+            $this->CI->db->insert("transfer_logs_trail", $trail);
         }
         $this->worker_model->updateFacialStatus($det->id,"done");
     }
