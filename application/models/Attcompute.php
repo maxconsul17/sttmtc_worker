@@ -1199,7 +1199,7 @@ class Attcompute extends CI_Model {
 
         $has_sched = $this->displaySched($eid,$date);
         $query = $this->db->query("
-                                    SELECT tstart, tend, approved_total AS total, status FROM group_overtime go LEFT JOIN overtime_request request ON request.aid = go.base_id WHERE go.date = '$date' AND request.employeeid = '$eid' limit 1
+                                    SELECT tstart, tend, approved_total AS total, status FROM group_overtime go LEFT JOIN overtime_request request ON request.aid = go.base_id WHERE go.date = '$date' AND request.employeeid = '$eid' AND request.status != 'CANCELLED' limit 1
                                 ");
        if($query->num_rows() > 0){
             foreach($query->result() as $value){
@@ -1243,7 +1243,7 @@ class Attcompute extends CI_Model {
                                     WHERE '$date'
                                     BETWEEN b.dfrom 
                                     AND b.dto 
-                                    AND c.employeeid = '$eid';");
+                                    AND c.employeeid = '$eid' AND b.status != 'CANCELLED';");
         return $query->row();
     }
     /**
