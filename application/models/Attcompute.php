@@ -1231,7 +1231,38 @@ class Attcompute extends CI_Model {
         return array($otreg,$otrest,$othol,$otstat);
     }
 
+   /**
+     * Check if a given date is considered a holiday for a specific employee.
+     *
+     * This method determines whether the provided date (`$dateFrom`) falls within 
+     * a valid holiday period in the `code_holiday_calendar` table, and checks if 
+     * the holiday is not prohibited for the given employee.
+     *
+     * @param string $dateFrom    The date to check (format: 'YYYY-MM-DD').
+     * @param string $employeeId  The employee ID to check against prohibited list.
+     * @return bool               True if it's a valid holiday for the employee, false otherwise.
+     * @author Leandrei Santos
+     */
+    public function isHolidayForEmployee($dateFrom, $employeeId){
+        $sql = "
+            SELECT 1
+            FROM code_holidays ch
+            INNER JOIN (
+                SELECT * 
+                FROM code_holiday_calendar
+                WHERE ? BETWEEN date_from AND date_to
+                ORDER BY date_from DESC
+                LIMIT 1
+            ) AS chc ON chc.holiday_id = ch.holiday_id
+            WHERE ch.prohibited IS NULL 
+            OR FIND_IN_SET(?, ch.prohibited) = 0
+            LIMIT 1
+        ";
 
+        $query = $this->db->query($sql, [$dateFrom, $employeeId]);
+
+        return $query->num_rows() > 0;
+    }
 
     function displayOTApp($eid = "", $date = "") {
         $query = $this->db->query(" SELECT a.office_hour,a.grand_total , a.approved_total, b.status, b.dfrom, b.dto
