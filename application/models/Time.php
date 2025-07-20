@@ -20,6 +20,15 @@ class Time extends CI_Model {
             return $hours * 60 + $minutes; 
        } 
    }
+
+   public function hours($time)
+   {
+       list($hours, $minutes) = explode(':', $time);  
+       // Ensure values are numeric
+       $hours = (int) $hours;
+       $minutes = (int) $minutes;   
+       return $hours + ($minutes / 60);
+   }
    
    // Transform minutes like "105" into hours like "1:45". 
    function minutesToHours($minutes) 
@@ -460,8 +469,10 @@ class Time extends CI_Model {
         $totalMinutes = 0;
     
         foreach ($times as $time) {
-            list($hours, $minutes) = explode(':', $time);
-            $totalMinutes += ($hours * 60) + $minutes;
+          if($time){
+              list($hours, $minutes) = explode(':', $time);
+              $totalMinutes += ($hours * 60) + $minutes;
+          }
         }
     
         // Convert back to HH:MM format
@@ -484,19 +495,51 @@ class Time extends CI_Model {
       return $end->getTimestamp() - $start->getTimestamp();
   }
 
-  function validateDateBetween($dateArray, $selectedDate){
+  /**
+   * Converts 12-hour time format (e.g., "01:00 PM") to 24-hour time (e.g., "13:00").
+   *
+   * @param string $time A time string in "h:i A" format.
+   * @return string Time in "H:i" (24-hour) format.
+   */
+  function convertTo24Hour($time) {
+      return date("H:i", strtotime($time));
+  }
 
-    // Convert the date strings to DateTime objects
-    $startDate = new DateTime($dateArray[0]);
-    $endDate = new DateTime($dateArray[1]);
-    $checkDate = new DateTime($selectedDate);
+  /**
+   * Determines whether a time range overlaps with a fixed lunch break (12:00 PM to 1:00 PM).
+   *
+   * @param string $startTime Start time in "h:i A" format (e.g., "11:30 AM").
+   * @param string $endTime End time in "h:i A" format (e.g., "01:30 PM").
+   * @return bool True if the time range overlaps the lunch break.
+   */
+  function shouldSubtractLunchBreak($startTime, $endTime, $employee_id="", $date="") {
+     $deptid = $this->extensions->getEmployeeDeptid($employee_id);
+     $is_holiday = $this->attcompute->isHolidayNew($employee_id, $date, $deptid);
+     $has_sched = $this->attcompute->displaySched($employee_id, $date);
 
-    // Check if the selected date is between the start and end dates
-    if ($checkDate >= $startDate && $checkDate <= $endDate) {
-        return true;
-    } else {
+     if($is_holiday == "" && $has_sched->num_rows() > 0){
       return false;
-    }
+     }
+
+     if($startTime == "12:00:00" && $endTime == "13:00:00"){
+      return false; // No lunch break deduction if the times are exactly during lunch
+     }
+
+      // Define lunch break range
+      $lunchStart = new DateTime("1970-01-01 12:00:00");
+      $lunchEnd = new DateTime("1970-01-01 13:00:00");
+
+      // Convert input times
+      $startDateTime = new DateTime("1970-01-01 " . $this->convertTo24Hour($startTime) . ":00");
+      $endDateTime = new DateTime("1970-01-01 " . $this->convertTo24Hour($endTime) . ":00");
+
+      // If end time is earlier than or equal to start, assume shift crosses midnight
+      if ($endDateTime <= $startDateTime) {
+          $endDateTime->modify('+1 day');
+      }
+
+      // Check for overlap with lunch break
+      return ($startDateTime < $lunchEnd && $endDateTime > $lunchStart);
   }
 
   function totalLateUndertimeDuration($datas)
@@ -543,6 +586,21 @@ class Time extends CI_Model {
             default:
                 throw new InvalidArgumentException("Invalid time component specified. Use 'hour' or 'minute'.");
         }
+    }
+
+    function validateDateBetween($dateArray, $selectedDate){
+
+      // Convert the date strings to DateTime objects
+      $startDate = new DateTime($dateArray[0]);
+      $endDate = new DateTime($dateArray[1]);
+      $checkDate = new DateTime($selectedDate);
+
+      // Check if the selected date is between the start and end dates
+      if ($checkDate >= $startDate && $checkDate <= $endDate) {
+          return true;
+      } else {
+        return false;
+      }
     }
 
 }

@@ -260,6 +260,17 @@ class Payrollcomputation extends CI_Model {
 		$arr_info = $ee_er = array();
 		$str_fixeddeduc = '';
 		$totalfix = 0;
+
+		$campus_code = $this->db->campus_code;
+		$qsites = $this->db->query("SELECT CONCAT(campusid, IF(subcampusid IS NOT NULL AND subcampusid != '', CONCAT(',', subcampusid), '')) AS allcampus FROM employee WHERE employeeid = '$empid'")->row(0)->allcampus;
+
+		$sites = explode(",", $qsites);
+        $other_sites = array_filter($sites, function($key) use($campus_code) {
+            return $key != $campus_code;
+        }, ARRAY_FILTER_USE_BOTH);
+		$otherSiteCount = count($other_sites);
+
+		$qcontri = $this->db->query("SELECT 1 FROM global_payroll_contribution_status WHERE employeeid = '$empid' AND status = '1'")->num_rows();
 		
 		// $total_gross = $arr_info_emp['grosspay'] + $prevGrosspay;
 		// Change To Basic Pay Salary
@@ -278,8 +289,33 @@ class Payrollcomputation extends CI_Model {
 		// $reference_amount = $arr_info_emp['salary'] + $prevSalary;
 		$reference_amount = $schedule == 'semimonthly' ? $regpay * 2 : $regpay;
 		$is_trelated = $this->employee->isTeachingRelated($empid);
-		if($tnt == "teaching" && !$is_trelated){
-			$reference_amount = $teaching_pay + $prev_teaching_pay;
+		// if($tnt == "teaching" && !$is_trelated){
+		// 	$reference_amount = $teaching_pay + $prev_teaching_pay;
+		// }
+		// echo $reference_amount;die;
+		if ($otherSiteCount > 0 && $qcontri){
+			list($otherSiteLecRate,$otherSiteMonthlyRate) = $this->api->getOtherSiteSalary($empid,$sdate);
+			$reference_amount += $otherSiteLecRate + $otherSiteMonthlyRate;
+		}
+		
+		// echo $otherSiteLecRate;die;
+		if($tnt == "teaching"){
+			$lechour = $this->db->query("SELECT lechour FROM payroll_employee_salary WHERE employeeid = '$empid' LIMIT 1")->row(0)->lechour;
+			// Globals::pd($lechour);die;
+			if ($lechour){
+				$latestSchedDate = $this->db->query("SELECT (dateactive) FROM employee_schedule_history WHERE employeeid = '$empid' AND DATE(dateactive) <= '$sdate' ORDER BY dateactive DESC LIMIT 1")->row(0)->dateactive;
+				// echo $latestSchedDate;die;
+				if ($latestSchedDate){
+					$latestSched = $this->db->query("SELECT employeeid, SUM(TIME_TO_SEC(TIMEDIFF(endtime, starttime))) / 3600 AS total_hours FROM employee_schedule_history WHERE employeeid = '$empid' AND leclab != 'ADMIN' AND DATE(dateactive) = '$latestSchedDate'")->row(0);
+					// Globals::pd($latestSched);die;
+					if ($latestSched){
+						$teachingMonthlyRate = ($lechour * $latestSched->total_hours) * 4;
+						$reference_amount += $teachingMonthlyRate;
+						// echo $reference_amount;die;
+					}
+				}
+			}
+
 		}
 		$res = $this->payrolloptions->getEmpFixedDeduc($empid,'amount','HIDDEN',$schedule,$quarter,'',$sdate,$edate);
 		// echo $this->db->last_query(); die;
@@ -303,7 +339,7 @@ class Payrollcomputation extends CI_Model {
 				}
 			}*/
 			if($row->code_deduction == 'PHILHEALTH'){
-				list($amount_fx,$er) = $this->computePHILHEALTHContri($amount_fx,$reference_amount,$cutoff_period,$sdate,$prevGrosspay,$quarter,$empid);
+				list($amount_fx,$er) = $this->computePHILHEALTHContri($amount_fx,$reference_amount,$cutoff_period,$sdate,$prevGrosspay,$quarter,$empid,$schedule,$edate);
 				if(!$this->payrolloptions->checkIdnumber($empid, $code_deduction)) $amount_fx = $er = 0;
 
 			}
@@ -313,11 +349,13 @@ class Payrollcomputation extends CI_Model {
 					// $arr_info_emp["grosspay"] = $basic_salary;
 					// $prevGrosspay = $prevSalary;
 				}
-				list($amount_fx,$ec,$er,$provident_er) = $this->computeSSSContri($amount_fx,$reference_amount,$prevGrosspay,$empid,$sdate,$edate,$quarter,$cutoff_period,$getTotalNotIncludedInGrosspay);
+				list($amount_fx,$ec,$er,$provident_er) = $this->computeSSSContri($amount_fx,$reference_amount,$prevGrosspay,$empid,$sdate,$edate,$quarter,$cutoff_period,$getTotalNotIncludedInGrosspay,$schedule);
 				if(!$this->payrolloptions->checkIdnumber($empid, $code_deduction)) $amount_fx = $er = $ec = 0;
+
+				
 			}
 			else if ($row->code_deduction == 'PAGIBIG') {
-				list($amount_fx,$er) = $this->computePagibigContri($amount_fx,$empid,$reference_amount, $cutoff_period, $quarter, $sdate);
+				list($amount_fx,$er) = $this->computePagibigContri($amount_fx,$empid,$reference_amount, $cutoff_period, $quarter, $sdate,$schedule,$sdate,$edate);
 				if(!$this->payrolloptions->checkIdnumber($empid, $code_deduction)) $amount_fx = $er = 0;
 			}
 			else if ($row->code_deduction == 'PERAA') {
@@ -339,6 +377,11 @@ class Payrollcomputation extends CI_Model {
 			$str_fixeddeduc .= $row->code_deduction . '=' . $amount_fx;
 		}
 
+		if (!$qcontri && $otherSiteCount > 0){
+			$arr_info = $ee_er = $arr_fixeddeduc_config = array();
+			$str_fixeddeduc = '';
+			$totalfix = 0;
+		}
 		return array($arr_fixeddeduc_config,$arr_info,$totalfix,$str_fixeddeduc,$ee_er);
 	}
 
@@ -450,8 +493,18 @@ class Payrollcomputation extends CI_Model {
 		}
 	}
 
-	function computePHILHEALTHContri($encoded_ee=NULL,$gross=0,$cutoff_period="",$sdate="",$prevGrosspay="",$quarter="",$empid=""){
+	function computePHILHEALTHContri($encoded_ee=NULL,$gross=0,$cutoff_period="",$sdate="",$prevGrosspay="",$quarter="",$empid="",$schedule="",$edate=""){
 		$ee = $er = $true_ee = 0;
+
+		//Verify whether the employee's income setup includes PHILHEALTH computation.
+		$gross += $this->adjustGrossForInclusion($schedule,$cutoff_period,$empid,$sdate,$edate,'philhealthIncluded');
+
+		// Globals::pd(array($schedule,$cutoff_period,$empid,$sdate,$edate,'philhealthIncluded'));die;
+
+		if(getenv("ENVIRONMENT") == "Office" || getenv("ENVIRONMENT") == "Staging" || getenv("ENVIRONMENT") == "Production"){
+			$gross += $this->api->getOtherSiteIncomeContri($schedule,$cutoff_period,$empid,$sdate,$edate,'philhealthIncluded');
+		}
+
 		$monthly_gross = $prevGrosspay + $gross;
 		if($encoded_ee == NULL){
 			$ee = $this->philhealthContribution($gross, $sdate);
@@ -481,10 +534,15 @@ class Payrollcomputation extends CI_Model {
 	}
 
 	///< Ticket #ICA-HYPERION21515
-	function computeSSSContri($encoded_ee=NULL,$gross=0,$prevGrosspay=0,$empid='',$sdate='',$edate='',$quarter='',$cutoff_period='',$getTotalNotIncludedInGrosspay=0){
+	function computeSSSContri($encoded_ee=NULL,$gross=0,$prevGrosspay=0,$empid='',$sdate='',$edate='',$quarter='',$cutoff_period='',$getTotalNotIncludedInGrosspay=0, $schedule = ''){
 		$ee = $ec = $er = $provident_er = 0;
 		$total_gross = 0;
 		$year = date("Y", strtotime($sdate));
+
+		//Verify whether the employee's income setup includes SSS computation.
+		$gross += $this->adjustGrossForInclusion($schedule,$cutoff_period,$empid,$sdate,$edate,'sssIncluded');
+		$gross += $this->api->getOtherSiteIncomeContri($schedule,$cutoff_period,$empid,$sdate,$edate,'sssIncluded');
+
 		if($cutoff_period == 3){
 			list($ee,$ec,$er,$provident_er) = $this->getSSSContriFromSetup($encoded_ee,$gross, date('Y',strtotime($sdate)));
 			
@@ -500,6 +558,60 @@ class Payrollcomputation extends CI_Model {
 
 		return array($ee,$ec,$er,$provident_er);
 	}
+
+	/**
+	 * Calculates the total gross income for a specific employee within a given cutoff period, 
+	 * schedule type, and date range, filtered by a specific inclusion flag (e.g., SSS, PhilHealth).
+	 *
+	 * This method dynamically checks whether a specific inclusion column (e.g., `sssIncluded`) 
+	 * is marked as included (`= 1`) in the payroll configuration and sums all corresponding 
+	 * income amounts for that employee.
+	 *
+	 * @param string $schedule       The payroll schedule type (e.g., 'semimonthly', 'monthly').
+	 * @param string $cutoffPeriod   The cutoff period identifier (e.g., '1', '2').
+	 * @param string $employeeId     The employee's unique ID.
+	 * @param string $startDate      The start date of the period (format: 'YYYY-MM-DD').
+	 * @param string $endDate        The end date of the period (format: 'YYYY-MM-DD').
+	 * @param string $included       The inclusion column to filter by (e.g., 'sssIncluded', 'philhealthIncluded').
+	 *                               Defaults to 'sssIncluded'.
+	 *
+	 * @return float                 The total gross amount for the given inclusion filter. Returns 0.0 if none found.
+	 * @author Leandrei Santos
+	 * @since 2025
+	 */
+	public function adjustGrossForInclusion($schedule, $cutoffPeriod, $employeeId, $startDate, $endDate, $included = 'sssIncluded')
+	{
+		// Whitelist allowed inclusion columns to prevent SQL injection
+		$allowedColumns = ['sssIncluded', 'pagibigIncluded', 'philhealthIncluded'];
+
+		// Default to 'sssIncluded' if an invalid column is passed
+		if (!in_array($included, $allowedColumns)) {
+			$included = 'sssIncluded';
+		}
+
+		$sql = "
+			SELECT SUM(a.amount) AS total_amount
+			FROM employee_income a
+			LEFT JOIN payroll_income_config b ON b.id = a.code_income
+			WHERE a.employeeid = ?
+			AND a.cutoff_period = ?
+			AND a.schedule = ?
+			AND b.{$included} = 1
+			AND a.datefrom <= ?
+		";
+
+		$query = $this->db->query($sql, [$employeeId, $cutoffPeriod, $schedule, $startDate]);
+
+		if ($query->num_rows() > 0) {
+			$row = $query->row();
+			return (float) $row->total_amount;
+		}
+
+		return 0.0;
+	}
+
+
+
 
 	///< Ticket #ICA-HYPERION21515
 	function getSSSContriFromSetup($encoded_ee=NULL,$gross=0,$year=""){
@@ -578,9 +690,15 @@ class Payrollcomputation extends CI_Model {
 		return array($prev_ee,$prev_ec,$prev_er);
 	}
 
-	function computePagibigContri($encoded_ee=NULL,$employeeid='',$gross=0, $cutoff_period=0, $quarter=0, $cutoffstart=""){
+	function computePagibigContri($encoded_ee=NULL,$employeeid='',$gross=0, $cutoff_period=0, $quarter=0, $cutoffstart="",$schedule="",$sdate="",$edate=""){
 		$ee = $er = 0;
 		$year = date("Y", strtotime($cutoffstart));
+
+		//Verify whether the employee's income setup includes PAGIBIG computation.
+		$gross += $this->adjustGrossForInclusion($schedule,$cutoff_period,$employeeid,$sdate,$edate,'pagibigIncluded');
+
+		$gross += $this->api->getOtherSiteIncomeContri($schedule,$cutoff_period,$employeeid,$sdate,$edate,'pagibigIncluded');
+
 		if($encoded_ee == NULL){
 			$query = $this->db->query("SELECT emp_ee,emp_er,per_ee,per_er FROM hdmf_deduction WHERE '$gross' BETWEEN compensationfrom AND compensationto AND year <= '$year' ORDER BY year DESC LIMIT 1");
 			if ($query->num_rows() > 0) {
@@ -591,13 +709,13 @@ class Payrollcomputation extends CI_Model {
 				if($emp_ee != 0){
 					$ee = $emp_ee;
 				}else if($per_ee != 0){
-					$er = $gross * "0.0".$per_ee;
+					$ee = $gross / 100 * $per_ee;
 				}
 				
 				if($emp_er != 0){
-					$ee = $emp_er;
+					$er = $emp_er;
 				}else if($per_er != 0){
-					$er = $gross * "0.0".$per_er;
+					$er = $gross / 100 * $per_er;
 				}
 			} 
 		}else{
@@ -623,7 +741,7 @@ class Payrollcomputation extends CI_Model {
 		if(sizeof($perdept_amt_arr) > 0){
 			foreach ($perdept_amt_arr as $aimsdept => $leclab_arr) {
 				foreach ($leclab_arr as $type => $amt) {
-					/*if ($type != 'ADMIN')*/ $perdept_amount += $amt['work_amount'];
+					if ($type != 'ADMIN') $perdept_amount += $amt['work_amount']; // binalik ko lang yung naka comment na type != 'ADMIN' kasi nag add yung late/ut sa teaching pay
 				}
 			}
 		}
@@ -651,17 +769,53 @@ class Payrollcomputation extends CI_Model {
 
 		return array($regpay, $salary);
 	}
-
-	function computeNTCutoffSalary($workdays=0,$fixedday=0,$regpay=0,$daily=0,$hasleave=false,$minimum_wage=0){
+	function getAdminSalaryPay($empid, $sdate, $edate){
+		$admin_hours_salary = 0;
+		$query = $this->db->query("SELECT a.employeeid, b.type, a.cutoffstart, a.cutoffend, a.tdr_admin, b.work_hours, b.deduc_hours
+									FROM attendance_confirmed a
+									LEFT JOIN workhours_perdept  b
+									ON a.id = b.base_id
+									WHERE b.type = 'ADMIN' AND employeeid='$empid' AND payroll_cutoffstart='$sdate' AND payroll_cutoffend='$edate' ");	
+									
+		$rate = $this->db->query("SELECT daily FROM payroll_employee_salary WHERE employeeid = '$empid'")->row();
+		
+		if($query->num_rows() > 0){
+			$row = $query->row();
+			$admin_hours = $row->work_hours;     
+			$daily_rate = (float) $rate->daily;       
+			$absent_hours = $row->deduc_hours;
+	
+			$workhours = $this->time->hoursToMinutes($admin_hours);
+			$rate = $daily_rate / 8 / 60;
+			$absent = $this->time->hoursToMinutes($absent_hours);
+			
+			$actual_work_minutes = $workhours - $absent;
+			
+			$admin_hours_salary = $actual_work_minutes * $rate;
+		}
+		
+		return $admin_hours_salary;
+	}
+	function computeNTCutoffSalary($workdays=0,$fixedday=0,$regpay=0,$daily=0,$hasleave=false,$minimum_wage=0, $day_absent=0, $workhours = "", $monthly = 0, $has_flexible = false){
 		$salary = 0;
 		if($fixedday){
 			$salary = $regpay;
 		}else{
-			$salary = $workdays * $daily;
+			$salary = ($workdays - $day_absent) * $daily;
 		}
 		if($hasleave && $salary > 0){
 			// $salary -= $daily;
 			// $salary += $minimum_wage;
+		}
+
+		if($has_flexible && $workhours != ""){
+			$hourly = $monthly / 26 / 8;
+			// Convert workhours string (e.g. "8:30") to  minutes
+			$workhours_decimal = $this->time->hours($workhours);
+			
+			// ibawas yung workdays salary nya since yung workhours nakabase sa lahat ng logs nya
+			$result = (($workhours_decimal * $hourly) - $salary);
+			$salary = floor($result * 100) / 100;
 		}
 
 		return $salary;
@@ -713,6 +867,7 @@ class Payrollcomputation extends CI_Model {
 		$minutely_orig = number_format($minutely_orig, 2, '.', '');*/
 
 		$setup = $this->getOvertimeSetup($employmentstat);
+
 		// echo '<pre>';
 		// print_r($setup);
 		// echo '</pre>';
@@ -722,7 +877,6 @@ class Payrollcomputation extends CI_Model {
 
 		if($base_id){
 			$ot_q = $this->utils->getSingleTblData($tbl,array('*'),array('base_id'=>$base_id));
-			
 			foreach ($ot_q->result() as $key => $row) {
 				$att_baseid = $row->id;
 
@@ -734,11 +888,11 @@ class Payrollcomputation extends CI_Model {
 				$ot_with_25 = $this->time->hoursToMinutes($row->total_ot_with_25);
 				$ot_without_25 = $this->time->hoursToMinutes($row->total_ot_without_25);
 
-				// $ot_min = $this->time->hoursToMinutes($ot_hours);
-				// $ot_hour = $ot_min / 60;
 
 				$ot_min = abs($ot_with_25+$ot_without_25);
 				$ot_hour = $ot_min / 60;
+
+				$ot_min = $this->time->hoursToMinutes($ot_hours);  //OT HOURS NA PO ANG IPAFOLLOW SINCE DI NA GAGAMITIN YUN MAY 25
 
 				$percent = 100; ///< default
 
@@ -751,23 +905,59 @@ class Payrollcomputation extends CI_Model {
 				$hourly_rate = $hourly * $percent;
 				$minutely_rate = $hourly_rate / 60; 
 
+				$initial_pay = ($ot_min*$minutely_rate);
 
-				$initial_pay = ($ot_min * $minutely_rate);
-
-				if($ot_with_25 != 0)
-				{
-					$percent_with = 125 / 100; //default
-					$initial_pay = ($ot_min * $minutely_rate) * $percent_with;
-				}
+				// if($ot_with_25 != 0)
+				// {
+				// 	$percent_with = 125 / 100; //default
+				// 	$initial_pay = ($ot_min*$minutely_rate) * $percent_with;
+				// }
 
 				$ot_det[$att_baseid] = $initial_pay; ///< insert later for overtime amount details
 
 				$overtimepay += $initial_pay;
+				// $overtimepay += $excessOvertimePay;
 
 			}
+
 		}
 
 		return array($overtimepay,$ot_det);
+	}
+
+	/**
+	 * Computes the pay for overtime minutes that exceed the allowed maximum.
+	 *
+	 * This function calculates the excess overtime pay by determining how many
+	 * minutes go beyond the allowable limit (default is 480 minutes or 8 hours),
+	 * then multiplying those excess minutes by the provided minutely rate.
+	 *
+	 * @param int $otMinutes            The total number of overtime minutes worked.
+	 * @param float $excessMinutelyRate The rate per minute to apply to excess OT minutes.
+	 * @param int $maxMinutes           The maximum allowable OT minutes before excess is counted (default: 480).
+	 *
+	 * @return float The calculated pay for excess overtime minutes. Returns 0 if within allowed limit.
+	 * @author Leandrei Santos
+	 * 2025
+	 */
+	function computeExcessOvertimePay($otMinutes, $excessMinutelyRate, $maxMinutes = 480)
+	{
+		if ($otMinutes > $maxMinutes) {
+			$excessMinutes = $otMinutes - $maxMinutes;
+			return $excessMinutes * $excessMinutelyRate;
+		}
+		return 0;
+	}
+
+
+
+	function timeToDecimal($timeString)
+	{
+		// Convert time to decimal format (H.MM)
+		list($hours, $minutes) = explode(':', $timeString);
+		$decimalTime = $hours . '.' . str_pad($minutes, 2, '0', STR_PAD_LEFT);
+
+		return floatval($decimalTime);
 	}
 
 	function computeSubstitute($empid,$id=''){
@@ -952,7 +1142,8 @@ class Payrollcomputation extends CI_Model {
 		}
 
 		return $whtax;
-	}	
+	}
+
 
 	private function calculateWithholdingTax($total_taxable=0,$schedule='',$regpay=0,$dependents=''){
 		$whtax = 0;
@@ -1163,8 +1354,10 @@ class Payrollcomputation extends CI_Model {
 		$tardy_amount = $absent_amount = $tardy = $ut = $absent = $isFinal = $day_absent = 0;
 		$workdays = 0;
 		$base_id = '';
-
+        $holiday = 0;
 		$minutely = $daily / 8 / 60;
+		$has_flexible = false;
+		$workhours = "";
 
 		$wC = '';
 		if($useDTRCutoff){
@@ -1173,7 +1366,8 @@ class Payrollcomputation extends CI_Model {
 			$wC .= " AND payroll_cutoffstart='$sdate' AND payroll_cutoffend='$edate'";
 		}
 	  
-    	$detail_q = $this->db->query("SELECT id, lateut, ut, absent, day_absent, workdays, isFinal, late_deduc FROM attendance_confirmed_nt WHERE employeeid='$empid' $wC");
+    	$detail_q = $this->db->query("SELECT id, lateut, ut, absent, day_absent, workdays, isFinal, late_deduc, isholiday, workhours, has_flexible FROM attendance_confirmed_nt WHERE employeeid='$empid' $wC");
+		// echo $this->db->last_query(); die;
     	if($detail_q->num_rows() > 0){
     		$base_id 	= $detail_q->row(0)->id;
 
@@ -1183,12 +1377,15 @@ class Payrollcomputation extends CI_Model {
     		$tabsent 	= $detail_q->row(0)->absent;
 
     		$workdays 	= $detail_q->row(0)->workdays;
+    		$workhours 	= $detail_q->row(0)->workhours;
+    		$has_flexible 	= $detail_q->row(0)->has_flexible;
     		$isFinal 	= $detail_q->row(0)->isFinal;
 
-	        $tardy = $this->attcompute->exp_time($late_deduc);
+	        $tardy = $this->attcompute->exp_time($tlec);
 	        $ut = $this->attcompute->exp_time($utlec);
 	        $absent = $this->attcompute->exp_time($tabsent);
 	        $day_absent 	= $detail_q->row(0)->day_absent;
+	        $holiday 	= $detail_q->row(0)->isholiday;
     	}
 
 
@@ -1199,8 +1396,9 @@ class Payrollcomputation extends CI_Model {
 	    $tardy_amount     = number_format($tardy * $minutely,2,'.', '');
 	    $absent_amount     = number_format($day_absent * $daily,2,'.', '');
 
+		// ADD HOLIDAY COUNT DITO PARA MABAYARAN
 		$total_schedule_days = $workdays;
-		return array($tardy_amount,$absent_amount,$total_schedule_days,$tardy,$absent,$base_id, $isFinal);
+		return array($tardy_amount,$absent_amount,$total_schedule_days,$tardy,$absent,$base_id, $isFinal, $day_absent, $workhours, $has_flexible);
 	}
 
 	# added by justin (with e) for ica-hyperion 21555
@@ -1217,7 +1415,7 @@ class Payrollcomputation extends CI_Model {
 	}
 
 	function getExistingWithholdingTax($employeeid, $date){
-			$query_whtax = $this->db->query("SELECT * FROM payroll_employee_salary_history WHERE date_effective <= '$date' AND employeeid = '$employeeid' ORDER BY date_effective DESC LIMIT 1 ");
+			$query_whtax = $this->db->query("SELECT * FROM payroll_employee_salary_history WHERE date_effective <= '$date' AND employeeid = '$employeeid' AND status = 1 ORDER BY date_effective DESC LIMIT 1 ");
 			if($query_whtax->num_rows() > 0) return $query_whtax->row()->whtax;
 			else return false;
 	}
@@ -1239,7 +1437,7 @@ class Payrollcomputation extends CI_Model {
 		if($base_res->num_rows() > 0) $base_id = $base_res->row(0)->id;
 
 		if($base_id){
-			$res = $this->db->query("SELECT * FROM payroll_emp_salary_perdept_history WHERE base_id='$base_id'");
+			$res = $this->db->query("SELECT aimsdept, lechour, labhour, rlehour FROM payroll_emp_salary_perdept_history WHERE base_id='$base_id'");
 			foreach ($res->result() as $key => $row) {
 				if($row->aimsdept == "all"){
 					$load_arr = $this->schedule->employeeScheduleList($employeeid);
@@ -1325,7 +1523,7 @@ class Payrollcomputation extends CI_Model {
 						if($admin_hours){
 							foreach($admin_hours as $count_admin => $admin_data){
 								list($lechour, $adminhour, $rlehour) = $this->getPerdeptSalaryByID($eid, $payroll_cutoff_from, $admin_data["aimsdept"]);
-								$admin_tothours = $admin_data["work_hours"] - ($admin_data["deduc_hours"] - $admin_data["late_hours"]);
+								$admin_tothours = (int) $admin_data["work_hours"] - ((int) $admin_data["deduc_hours"] -(int) $admin_data["late_hours"]);
 								$admin_tothours = $admin_tothours / 60;
 								$admin_amount = $admin_tothours * ($adminhour / 60);
 								if($holidayInfo["holiday_type"]==5) $admin_amount /= 2;

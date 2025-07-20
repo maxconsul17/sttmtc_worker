@@ -526,6 +526,7 @@ function showStudentSY() {
 
 
     function getCampusUser() {
+        $usercampus = "";
         if($GLOBALS['_SERVER']['DB_NAME'] == 'HRIS_STTHRESE_LA_FIESTA'){
         	$usercampus = 'https://lafiesta-sttheresehris.pinnacle.edu.ph/';
         }else if ($GLOBALS['_SERVER']['DB_NAME'] == 'HRIS_STTHRESE_MAGDALO') {
@@ -3422,6 +3423,11 @@ function showStudentSY() {
             return "";
         }
         
+    }
+
+    public function getBankInfo($code){
+        $query =  $this->db->query("SELECT * FROM code_bank_account WHERE code = '$code'");
+        return $query->num_rows() > 0 ? $query->row() : "";
     }
 
     function getUserUsernameByID($id){

@@ -11,9 +11,7 @@ if ( ! defined('BASEPATH')) exit('No direct script access allowed');
 class Payrollreport extends CI_Model {
 
 	//by NACES
-	function getPayslipSummary($emplist=array(), $sdate='',$edate='',$schedule='',$quarter='',$bank='',$status='PROCESSED'){
-
-
+	function getPayslipSummary($emplist=array(), $sdate='',$edate='',$schedule='',$quarter='',$bank='',$status='PROCESSED',$isSub = false){
 
 		$this->load->model("payrollprocess");
 
@@ -45,7 +43,6 @@ class Payrollreport extends CI_Model {
 		$loan_config_q = $this->payroll->displayLoan();
 		$arr_loan_config = $this->payrollprocess->constructArrayListFromStdClass($loan_config_q,'id','description');
 
-
 		foreach ($emplist as $row) {
 			//< $emplist as row database table ["payroll_employee_salary"]
 			$empid = $row["employeeid"];
@@ -55,6 +52,13 @@ class Payrollreport extends CI_Model {
 
 			///< check for computation
 			$res = $this->payrollprocess->getPayrollSummary($status,$sdate,$edate,$schedule,$quarter,$empid,FALSE,$bank);
+
+			if($isSub)
+			{
+				$res = $this->payrollprocess->getPayrollSummarySub($status,$sdate,$edate,$schedule,$quarter,$empid,FALSE,$bank);
+			}
+
+
 
 
 			if($res->num_rows() > 0){
@@ -172,7 +176,6 @@ class Payrollreport extends CI_Model {
 			// );
 
 		} //end loop emplist
-
 		
 		$data['emplist'] = $arr_info;
 		$data['income_config'] = $arr_income_config;
@@ -319,7 +322,7 @@ class Payrollreport extends CI_Model {
 		if($employeeid) $wC .= " AND b.employeeid IN ($employeeid)";
 		if($company_campus) $wC .= ' AND b.company_campus =  "'.$company_campus.'"';
 		if($tnt && $tnt != 'undefined'){
-			if($tnt != "trelated") $wC .= " AND b.teachingtype = '$tnt' ";
+			if($tnt != "trelated") $wC .= " AND b.teachingtype = '$tnt' AND b.trelated = '0' ";
       		else $wC .= " AND b.teachingtype='teaching' AND b.trelated = '1'";
 		}
 		if($sortby == "department"){
@@ -382,7 +385,7 @@ class Payrollreport extends CI_Model {
 		if($office) $whereClause .= " AND b.office = '$office'";
 		if($employeeid) $whereClause .= " AND b.employeeid IN ($employeeid)";
 		if($type && $type != 'undefined'){
-	        if($type != "trelated") $whereClause .= " AND b.teachingtype = '$type' ";
+	        if($type != "trelated") $whereClause .= " AND b.teachingtype = '$type' AND b.trelated = '0' ";
 	        else $whereClause .= " AND b.teachingtype='teaching' AND b.trelated = '1'";
 	    }
 		if($sortby == "department"){

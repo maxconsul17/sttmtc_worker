@@ -73,6 +73,8 @@ class PayrollManager
 		$sortby 			=  ($formdata['sortby']) ?? '';
 		$office 			=  ($formdata['office']) ?? '';
 		$teachingtype 		=  ($formdata['tnt']) ?? '';
+		$isSub 		        =  ($formdata['isSub']) ?? '';
+		$company 		        =  ($formdata['company']) ?? '';
         $employmentstat     =  isset($formdata['employmentstat']) ? $formdata['employmentstat'] : '';
 
 		$reportname 		=  ($formdata['reportname']) ?? '';
@@ -95,7 +97,7 @@ class PayrollManager
 
         if(!$status) $status = $formdata['payroll_status'] ?? '';
 
-        $data = $this->payrollprocess->getAtmPayrolllist($emp_bank, $sdate, $status, $sortby,$campus, $company_campus,$deptid,$office,$teachingtype,$employeeid, $employmentstat);
+        // $data = $this->payrollprocess->getAtmPayrolllist($emp_bank, $sdate, $status, $sortby,$campus, $company_campus,$deptid,$office,$teachingtype,$employeeid, $employmentstat);
         $data['sdate'] = $sdate;
         $data['edate'] = $edate;
         $data['sortby'] = $sortby;
@@ -116,6 +118,58 @@ class PayrollManager
         $data['second_person_name'] = ($formdata['second_person_name']) ?? '';
         $data['second_person_position'] = ($formdata['second_person_position']) ?? '';
         $data["path"] = "files/payroll/{$job_det->id}.pdf";
+        $data['list'] = array();
+
+        $isSubsite = false;
+
+        if($isSub){
+            $isSubsite = true;
+        }
+
+        $emplist = $this->payroll->loadAllEmpbyDeptForProcessed($deptid,$employeeid,$schedule,$campus,$sortby, $company, $office, $teachingtype,$isSubsite, $employmentstat);
+
+        $status =  ($formdata['emp_status']) ? $formdata['emp_status'] : "";
+
+        if($isSubsite)
+        {
+            $payroll_data = $this->payrollprocess->getProcessedPayrollSummarySub($emplist,$sdate,$edate,$schedule,$quarter,'PROCESSED',$emp_bank);
+        }else{
+            $payroll_data = $this->payrollprocess->getProcessedPayrollSummary($emplist,$sdate,$edate,$schedule,$quarter,'PROCESSED',$emp_bank);
+        }
+        
+        foreach($payroll_data['emplist'] as $key => $val){
+                
+            $info = $this->extras->getBankInfo($emp_bank);
+            
+            $data['list'][$key] = array(
+                'fullname'=> $val["fullname"] ?? "",
+                'account_num'=>"",
+                'net_salary'=>$val["netpay"] ?? "",
+                'company_campus'=>$val["company_campus"] ??"" ,
+                "fname" => $val->fname ?? "",
+                "mname" => $val->mname ??"",
+                "lname" => $val->lname ?? "",
+                "bank_id" => $emp_bank ?? "",
+                "comp_code" => $info->comp_code ?? "",
+                "account_number" => $info->account_number ?? "",
+                "bank_name" => $info->bank_name ?? "",
+                "branch" => $info->branch ?? "",
+            );
+        }
+        
+        $departments = $this->extras->showdepartment();
+        $data['dept'] 	= $departments[$deptid];
+        $data['deptid'] = $deptid;
+        $data['employmentstat'] = $employmentstat;
+        $data['employeeid'] = $employeeid;
+        $data['schedule'] = $schedule;
+        $data['payrollcutoff'] = $cutoff;
+        $data['quarter'] = $quarter;
+        $data['campusid'] = $campus;
+        $data['status'] = 'PROCESSED';
+        $data['sortby'] = $sortby;
+        $data['isSub'] = $isSubsite;
+
 
         // echo "<pre>";print_r($data);die;
         $this->CI->load->view('forms_pdf/atm_payroll_list',$data);
