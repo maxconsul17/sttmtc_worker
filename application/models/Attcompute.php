@@ -74,16 +74,27 @@ class Attcompute extends CI_Model {
     /*
      * Schedule
      */
-    function displaySched($eid="",$date = ""){
+   function displaySched($eid="",$date = ""){
         $return = "";
         $wc = "";
-        $latestda = date('Y-m-d', strtotime($this->extensions->getLatestDateActive($eid, $date)));
-        if($date >= $latestda) $wc .= " AND DATE(dateactive) = DATE('$latestda')";
+
+        $istemporary = $this->db->query("SELECT dateactive FROM  employee_schedule_history WHERE employeeid = '$eid' AND DATE(dateactive) = '$date' AND is_temporary ='1'");
+        
+        if($istemporary->num_rows() > 0){
+            $latestda = date('Y-m-d', strtotime($this->extensions->getLatestDateActive($eid, $date)));
+        }else{
+            $latestda = date('Y-m-d', strtotime($this->extensions->getLatestDateActive2($eid, $date)));
+        }
+   
+            if($date >= $latestda) $wc .= " AND DATE(dateactive) = DATE('$latestda')";
+
+        // if($date >= $latestda) $wc .= " AND DATE(dateactive) = DATE('$latestda')";
+
         $query = $this->db->query("SELECT dateactive FROM employee_schedule_history WHERE employeeid = '$eid' AND idx  = DATE_FORMAT('$date','%w') AND DATE(dateactive) <= '$date' $wc ORDER BY dateactive DESC,starttime DESC LIMIT 1;");
         
         if($query->num_rows() > 0){
             $da = $query->row(0)->dateactive;
-            $query = $this->db->query("SELECT * FROM employee_schedule_history WHERE employeeid = '$eid' AND idx  = DATE_FORMAT('$date','%w') AND DATE(dateactive) <= '$date' AND DATE_FORMAT(dateactive,'%Y-%m-%d %H') = DATE_FORMAT('$da','%Y-%m-%d %H') GROUP BY starttime,endtime ORDER BY starttime;"); 
+            $query = $this->db->query("SELECT * FROM employee_schedule_history WHERE employeeid = '$eid' AND idx  = DATE_FORMAT('$date','%w') AND DATE(dateactive) <= '$date' AND DATE_FORMAT(dateactive,'%Y-%m-%d %H') = DATE_FORMAT('$da','%Y-%m-%d %H') GROUP BY starttime,endtime ORDER BY starttime;");
         }
         return $query; 
     }
@@ -693,7 +704,7 @@ class Attcompute extends CI_Model {
         }
         if($logout <= $earlyd && !$absent) $absent = date('H:i', mktime(0,$totalHoursOfWork));  // log-out <= start of schedule will be marked as absent.
         if(!$absent && $earlyd)if($logout < $earlyd) $absent = date('H:i', mktime(0,$totalHoursOfWork));  // log-out <= early dismissal will be marked as absent. 
-        if(!$absent && $absent_start)if($login >= $absent_start) $absent = date('H:i', mktime(0,$totalHoursOfWork));  // log-in >= absent start will be marked as absent. 
+        if(!$absent && $absent_start)if($login > $absent_start) $absent = date('H:i', mktime(0,$totalHoursOfWork));  // log-in >= absent start will be marked as absent. 
         // if(!$isteaching)    $absent = ($absent/2) ? ($absent/2) : "";
 
         if(!$absent && !$login && !$logout){
@@ -894,13 +905,15 @@ class Attcompute extends CI_Model {
         if($query3 && $query3->num_rows() > 0){  
 
             $res = $query3->row(0);
-            if($res->othertype == "DA"){
+            if($res->type == "DA"){
                 $is_wfh = $this->attcompute->isWfhOB($eid,$date);
+                $res->obtypes == "3" ? $oltype .= "OFFICIAL BUSINESS": "";
                 if($is_wfh->num_rows() == 1){
                     $ob_id = $is_wfh->row()->aid;
                     $hastime = $this->attcompute->hasWFHTimeRecord($ob_id,$date);
                     if($hastime->num_rows() == 0){
                         // $ol = $oltype = $ob = "";
+                       
                     }
                     else{
                         $fitSched = false;
@@ -912,7 +925,7 @@ class Attcompute extends CI_Model {
                             }
                         }
                         if($fitSched){
-                            $othertype = $res->othertype;
+                            $othertype = $res->type;
                             $ob = 1.00;
                             if($oltype) $oltype .= "<br><br>OFFICIAL BUSINESS";
                             else $oltype .= "OFFICIAL BUSINESS";
@@ -924,7 +937,6 @@ class Attcompute extends CI_Model {
             }
 
         }
-
         return [
             isset($el) ? $el : 0,
             isset($vl) ? $vl : 0,
@@ -1020,7 +1032,15 @@ class Attcompute extends CI_Model {
 
     function displayChangeSchedApp($employeeid='',$date=''){
         $return = '';
-        $query = $this->db->query("SELECT a.id,b.status FROM change_sched_app_emplist_items a INNER JOIN change_sched_app b ON a.base_id = b.id WHERE '$date' BETWEEN b.dfrom AND b.dto AND a.employeeid='$employeeid' AND b.status = 'APPROVED'"); 
+        $query = $this->db->query("SELECT a.id,b.status, c.date_effective 
+                                    FROM change_sched_app_emplist_items a 
+                                    INNER JOIN change_sched_app b 
+                                    ON a.base_id = b.id 
+                                    LEFT JOIN `change_sched_app_detail` c
+                                    ON a.base_id = c.base_id
+                                    WHERE b.date_effective =  '$date'
+                                    AND a.employeeid='$employeeid' AND b.status = 'APPROVED' 
+                                    GROUP BY a.base_id"); 
         if($query->num_rows() > 0){
             $return = "APPROVED CHANGE SCHEDULE APPLICATION";
         }
@@ -1034,7 +1054,7 @@ class Attcompute extends CI_Model {
         $service_credit = '';
         $time_aff = $stime.'|'.$etime;
         
-        $query = $this->db->query("SELECT a.*,b.* FROM sc_app_use a LEFT JOIN sc_app_use_emplist b ON a.id = b.base_id WHERE b.employeeid='$eid' AND a.date = '$date' AND b.status = 'APPROVED'");
+        $query = $this->db->query("SELECT a.*,b.* FROM sc_app_use a LEFT JOIN sc_app_use_emplists b ON a.id = b.base_id WHERE b.employeeid='$eid' AND a.date = '$date' AND b.status = 'APPROVED'");
         
         if($query->num_rows() > 0){
             foreach($query->result() as $row)
@@ -1063,7 +1083,7 @@ class Attcompute extends CI_Model {
     function displayServiceCreditRemarks($eid,$stime,$etime,$date)
     {
         $return = '';
-        $query = $this->db->query("SELECT DISTINCT a.otype FROM timesheet a  INNER JOIN sc_app_use_emplist b ON(b.`employeeid` = a.`userid`) WHERE b.`status` = 'APPROVED' AND DATE(timein) = '$date' AND DATE(timeout) = '$date'  AND  b.employeeid='$eid' ORDER BY timein ASC");
+        $query = $this->db->query("SELECT DISTINCT a.otype FROM timesheet a  INNER JOIN sc_app_use_emplists b ON(b.`employeeid` = a.`userid`) WHERE b.`status` = 'APPROVED' AND DATE(timein) = '$date' AND DATE(timeout) = '$date'  AND  b.employeeid='$eid' ORDER BY timein ASC");
         if ($query->num_rows() > 0) {
             $return = $query->row(0)->otype;
         }
@@ -1123,7 +1143,7 @@ class Attcompute extends CI_Model {
             $return.=($return?", CHANGE SCHEDULE APPLICATION":"CHANGE SCHEDULE APPLICATION");
         }
 
-        $query4 = $this->db->query("SELECT a.id FROM sc_app_emplist a INNER JOIN sc_app b ON a.base_id = b.id WHERE `date`='$date' AND a.employeeid='$eid' AND b.status = 'PENDING'"); 
+        $query4 = $this->db->query("SELECT a.id FROM sc_app_emplists a INNER JOIN sc_app b ON a.base_id = b.id WHERE `date`='$date' AND a.employeeid='$eid' AND b.status = 'PENDING'"); 
         if($query4->num_rows() > 0){  
             $return.=($return?", SERVICE CREDIT APPLICATION":"SERVICE CREDIT APPLICATION");
         }
@@ -1153,9 +1173,9 @@ class Attcompute extends CI_Model {
                                    BETWEEN b.datefrom 
                                    AND b.dateto 
                                    AND a.employeeid='$eid' 
+                                   and isHalfDay != '1'
                                    AND b.status = 'APPROVED'
-                                   AND b.type = 'DA'
-                                   ");
+                                   AND b.type = 'DA'");
          if (!$query) {
             log_message('error', 'No data: ' . $this->db->last_query());
             return false;
@@ -1199,7 +1219,7 @@ class Attcompute extends CI_Model {
 
         $has_sched = $this->displaySched($eid,$date);
         $query = $this->db->query("
-                                    SELECT tstart, tend, approved_total AS total, status FROM group_overtime go LEFT JOIN overtime_request request ON request.aid = go.base_id WHERE go.date = '$date' AND request.employeeid = '$eid' AND request.status != 'CANCELLED' limit 1
+                                    SELECT tstart, tend, approved_total AS total, status FROM group_overtime go LEFT JOIN overtime_request request ON request.aid = go.base_id WHERE go.date = '$date' AND request.employeeid = '$eid' and request.status != 'CANCELLED' limit 1
                                 ");
        if($query->num_rows() > 0){
             foreach($query->result() as $value){
@@ -1218,7 +1238,7 @@ class Attcompute extends CI_Model {
                     $otreg = $otrest = 0;
                     $othol += $this->attcompute->exp_time($value->total);
                 }else{
-                    if      ($has_sched)  $otreg += $this->attcompute->exp_time($value->total);
+                    if      (!empty($has_sched->result()))  $otreg += $this->attcompute->exp_time($value->total);
                     else                 $otrest += $this->attcompute->exp_time($value->total);
                 }
             }
@@ -1231,7 +1251,7 @@ class Attcompute extends CI_Model {
         return array($otreg,$otrest,$othol,$otstat);
     }
 
-   /**
+    /**
      * Check if a given date is considered a holiday for a specific employee.
      *
      * This method determines whether the provided date (`$dateFrom`) falls within 
@@ -1243,7 +1263,8 @@ class Attcompute extends CI_Model {
      * @return bool               True if it's a valid holiday for the employee, false otherwise.
      * @author Leandrei Santos
      */
-    public function isHolidayForEmployee($dateFrom, $employeeId){
+    public function isHolidayForEmployee(string $dateFrom, string $employeeId): bool
+    {
         $sql = "
             SELECT 1
             FROM code_holidays ch
@@ -1263,6 +1284,9 @@ class Attcompute extends CI_Model {
 
         return $query->num_rows() > 0;
     }
+
+
+
 
     function displayOTApp($eid = "", $date = "") {
         $query = $this->db->query(" SELECT a.office_hour,a.grand_total , a.approved_total, b.status, b.dfrom, b.dto
@@ -1372,6 +1396,7 @@ class Attcompute extends CI_Model {
 
         $query_result =  $query->result();
 
+        $excessTime = "00:00";
 
         if(count($query_result) > 0)
         {
@@ -1381,17 +1406,35 @@ class Attcompute extends CI_Model {
             $otTotalWithout25 = $this->attendance->loadTotalOT($employeeid,$date,$date,"total_ot_without_25");
 
             $holidayType = $this->loadHolidayType($employeeid,$date);
-            $excessTime = $this->excessLimit($query_result[0]->approved_total?$query_result[0]->approved_total:"00:00");
+
+
+            // Calculate excess time based on approved overtime total.
+            // If the value is empty, default to "00:00"
+            $approvedTotal = !empty($query_result[0]->approved_total) ? $query_result[0]->approved_total : "00:00";
+            $excessTime = $this->calculateOvertimeExcess($otTotalWith25);
+
+            // Default flag for excess status (separate saving handled elsewhere)
+            $isExcess = 0;
+
+            $ot_hours = $query_result[0]->approved_total?$query_result[0]->approved_total:"";
+
+            if($excessTime != "00:00"){
+                $ot_hours = "08:00";
+            }
+
 
             $result['base_id'] = $base_id;
-            $result['ot_hours'] = $query_result[0]->approved_total?$query_result[0]->approved_total:"";
+            $result['ot_hours'] = $ot_hours;
             $result['ot_type'] = $ot_type;
             $result['holiday_type'] =  $holidayType ;
-            $result['is_excess'] = $excessTime;
+            $result['is_excess'] = $isExcess; 
             $result['total_ot_with_25']=$otTotalWith25;
             $result['total_ot_without_25']=$otTotalWithout25;
         }
-        return $result;
+
+
+
+        return [$result,$excessTime];
 
     }
 
@@ -1409,6 +1452,38 @@ class Attcompute extends CI_Model {
         return $excess;
     }
 
+    /**
+     * Calculate the amount of overtime that exceeds the standard 8-hour limit.
+     *
+     * This function takes an overtime string in "HH:MM" format, converts it to seconds,
+     * and computes how much time exceeds the 8-hour (28800 seconds) limit.
+     * If there is excess time, it returns the value in "HH:MM" format; otherwise, returns "00:00".
+     *
+     * @param string $overtime A time string in "HH:MM" format representing total overtime.
+     * @return string Formatted excess overtime in "HH:MM", or "00:00" if within limit.
+     */
+    public function calculateOvertimeExcess(string $overtime): string
+    {
+        $standardLimitInSeconds = 8 * 60 * 60; // 8 hours = 28800 seconds
+        $excessInSeconds = 0;
+
+        // Convert input overtime to seconds using helper function exp_time()
+        $overtimeInSeconds = $this->exp_time(!empty($overtime) ? $overtime : "00:00");
+
+        // Check if overtime exceeds the standard limit
+        if ($overtimeInSeconds > $standardLimitInSeconds) {
+            $excessInSeconds = $overtimeInSeconds - $standardLimitInSeconds;
+
+            $hours = floor($excessInSeconds / 3600);
+            $minutes = floor(($excessInSeconds % 3600) / 60);
+
+            return sprintf('%02d:%02d', $hours, $minutes);
+        }
+
+        return "00:00";
+    }
+
+
     function loadHolidayType($employeeid="",$date="")
     {
         $result = "NONE";
@@ -1417,7 +1492,7 @@ class Attcompute extends CI_Model {
                                     LEFT JOIN code_holidays AS ch ON chc.holiday_id = ch.holiday_id
                                     LEFT JOIN code_holiday_type AS cht ON cht.holiday_type = ch.holiday_type
                                     WHERE 
-                                        !FIND_IN_SET('$employeeid', ch.prohibited) 
+                                        (ch.prohibited IS NULL OR FIND_IN_SET('$employeeid', ch.prohibited) = 0)
                                         AND '$date' BETWEEN chc.date_from AND chc.date_to;");
 
         $query_result = $query->result();
@@ -1427,7 +1502,6 @@ class Attcompute extends CI_Model {
             if(strpos($query_result[0]->description, 'SPECIAL')!== false) $result = 'SPECIAL';
             else if(strpos($query_result[0]->description, 'REGULAR')!== false) $result = 'REGULAR';
         }
-
         return $result;
     }
 
@@ -1619,7 +1693,8 @@ class Attcompute extends CI_Model {
 
             if(isset($holiday[0]->campus)){
 
-                if ($holiday[0]->campus == "All" OR $holiday[0]->campus == "" OR $holiday[0]->campus == $campusid) {
+                // if ($holiday[0]->campus == "All" OR $holiday[0]->campus == "" OR $holiday[0]->campus == $campusid) {
+                if (true) {
 
                     if ($holiday[0]->teaching_type == "all" OR $holiday[0]->teaching_type == $teachingtype) {
 
@@ -1686,7 +1761,7 @@ class Attcompute extends CI_Model {
     function displaySCUsageAttendance($eid, $date, $stime, $etime){
         $sc_use = $isHalfDay = $sc_app_id = $sched_affected = "";
         $official_time = $stime.'|'.$etime;
-        $query = $this->db->query("SELECT * FROM sc_app_use a LEFT JOIN sc_app_use_emplist b  ON a.id = b.base_id WHERE b.employeeid = '$eid' AND date = '$date' AND b.upstatus = 'APPROVED'");
+        $query = $this->db->query("SELECT * FROM sc_app_use a LEFT JOIN sc_app_use_emplists b  ON a.id = b.base_id WHERE b.employeeid = '$eid' AND date = '$date' AND a.status = 'APPROVED'");
         if($query->num_rows() > 0){
             $isHalfDay = $query->row()->ishalfday;
             $sc_app_id = $query->row()->id;
@@ -1709,10 +1784,10 @@ class Attcompute extends CI_Model {
     }
 
 
-    function displaySCAttendance($eid, $date, $stime, $etime) {
+    function displaySCAttendance($eid, $date, $stime = '', $etime = '') {
         $sc = 0;
         $official_time = $stime . '|' . $etime;
-        $sql = "SELECT * FROM sc_app a LEFT JOIN sc_app_emplist b ON a.id = b.base_id WHERE b.employeeid = ? AND date = ? AND b.upstatus = ?";
+        $sql = "SELECT * FROM sc_app a LEFT JOIN sc_app_emplists b ON a.id = b.base_id WHERE b.employeeid = ? AND date = ? AND a.status = ?";
         
         $query = $this->db->query($sql, [$eid, $date, 'APPROVED']);
         
@@ -1774,7 +1849,7 @@ class Attcompute extends CI_Model {
         $query = $this->db->query(
             "SELECT a.status as `status` 
              FROM sc_app a 
-             LEFT JOIN sc_app_emplist b ON a.id = b.base_id 
+             LEFT JOIN sc_app_emplists b ON a.id = b.base_id 
              WHERE b.employeeid = ? 
                AND `date` = ? 
                AND a.status IN ('PENDING', 'APPROVED')",
@@ -2111,6 +2186,39 @@ class Attcompute extends CI_Model {
         else                $tbl = "timesheet_bak";
         // $query = $this->db->query("SELECT timein,timeout,otype FROM $tbl WHERE userid='$eid' AND DATE(timein)='$date' ORDER BY timein ASC");
         $query = $this->db->query("SELECT MIN(timein) AS timein,MAX(timeout) AS timeout,otype FROM $tbl WHERE userid='$eid' AND DATE(timein)='$date' ORDER BY timein ASC");
+
+        if($query && $query->num_rows() > 0){
+            foreach($query->result() as $row)
+            {
+                $timein = $row->timein;
+                $timeout = $row->timeout;
+                if($timein!=null || $timeout!=null){
+                    if($timein=='0000-00-00 00:00:00') $timein = "";
+                    if($timeout=='0000-00-00 00:00:00') $timeout = "";
+                    array_push($return,array($timein,$timeout,$row->otype));
+                }
+            }
+        }else{
+            $query = $this->db->query("SELECT logtime FROM timesheet_trail WHERE userid='$eid' AND (DATE(logtime)='$date' OR DATE(localtimein)='$date') AND log_type = 'IN' ORDER BY logtime DESC");
+            if($query && $query->num_rows() > 0){
+                foreach($query->result() as $row)
+                {
+                    $logtime = ($row->logtime == "0000-00-00 00:00:00" ? $row->localtimein : $row->logtime);
+                    if($logtime=='0000-00-00 00:00:00') $logtime = "";
+                    array_push($return,array($logtime,"",""));
+                }
+            }   
+            
+        }
+        
+        return $return;
+    }
+
+    function displayLogTimeFlexiAll($eid="",$date="",$tbl=""){
+        $return = array();
+        if($tbl == "NEW")   $tbl = "timesheet";
+        else                $tbl = "timesheet_bak";
+        $query = $this->db->query("SELECT timein,timeout,otype FROM $tbl WHERE userid='$eid' AND DATE(timein)='$date' ORDER BY timein ASC");
 
         if($query && $query->num_rows() > 0){
             foreach($query->result() as $row)
@@ -3179,6 +3287,98 @@ class Attcompute extends CI_Model {
         return sprintf("%d:%02d", $totalHours, $totalMinutes);
     }
     
+    public function displayOvertime($employeeid, $date){
+        $remarks = "";
 
+        list($regular, $restday, $holiday, $status) = $this->displayOt($employeeid, $date, false);
+
+        $ot_regular = $regular ? $regular : "--";
+        $ot_restday = $restday ? $restday : "--";
+        $ot_holiday = $holiday ? $holiday : "--";
+
+        if($status == 'APPROVED'){
+            $remarks = "APPROVED OVERTIME APPLICATION";
+        }else{
+            if($regular || $restday || $holiday) $remarks = "PENDING OVERTIME APPLICATION";
+        }
+
+        return [$ot_regular, $ot_restday, $ot_holiday, $remarks];
+    }
+
+    // hiniwalay ko siya for flexible schedule
+    public function displayCorrection($employeeid, $date){
+        $query_correction = $this->db->query("
+                                                SELECT b.status FROM ob_app_emplist a 
+                                                INNER JOIN ob_app b ON a.base_id = b.id 
+                                                WHERE '$date' BETWEEN b.datefrom AND b.dateto AND 
+                                                a.employeeid='$employeeid' AND b.type = 'CORRECTION'
+                                            ");
+
+        if($query_correction->num_rows() > 0){  
+            $data = $query_correction->row(0);
+            $correction_status = $query_correction->row(0)->status;
+
+            $remarks = $correction_status == 'PENDING' ? "<br>Pending Correction Application" : ($correction_status == 'APPROVED' ? "<br>Approved Correction Application" : "");      
+            
+            return [$data, $remarks];
+        }
+
+        return [null, ""];
+    }
+
+     public function loadTotalOTPerDate($employeeId,$date,$columnName)
+    {
+        // Use parameterized queries to prevent SQL injection
+        $query = $this->db->query("
+            SELECT {$columnName}
+            FROM employee_attendance_nonteaching
+            WHERE employeeid = ? AND DATE = ? LIMIT 1
+        ", [$employeeId, $date]);
+    
+        // Fetch and return the result as a string
+        $result = $query->row();
+        
+        // Check if the column exists and is not NULL
+        if (!empty($result->$columnName)) {
+            // Remove seconds (HH:MM:SS → HH:MM)
+            $timeParts = explode(":", $result->$columnName);
+            return $timeParts[0] . ":" . $timeParts[1]; // Return HH:MM
+        }
+
+
+        // Return '00:00' if no result is found
+        return '00:00';
+    }
+
+
+
+
+    public function loadTotalOT($employeeId, $startDate,$endDate,$columnName)
+    {
+        // Query using parameterized values
+        $query = $this->db->query("
+        SELECT SEC_TO_TIME(SUM(TIME_TO_SEC(totalOT))) AS grandTotalOT
+        FROM (
+            SELECT DATE, SEC_TO_TIME(MAX(TIME_TO_SEC($columnName))) AS totalOT
+            FROM employee_attendance_nonteaching
+            WHERE employeeid = ? 
+            AND DATE BETWEEN ? AND ?
+            GROUP BY DATE
+        ) AS filteredOT;
+        ", [$employeeId, $startDate, $endDate]);
+
+        // Fetch the result
+        $result = $query->row();
+
+        // Check if totalOT exists and is not NULL
+        if (!empty($result->grandTotalOT)) {
+        // Remove seconds (HH:MM:SS → HH:MM)
+        $timeParts = explode(":", $result->grandTotalOT);
+        return $timeParts[0] . ":" . $timeParts[1]; // Return HH:MM format
+        }
+
+        // Default value if no record is found
+        return '00:00';
+    }
 
 }

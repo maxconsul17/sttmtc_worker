@@ -177,7 +177,6 @@ class Api extends CI_Model {
 		$this->db->where($filter)
          ->set('status', $status)
          ->update('employee_to_calculate');
-
 		//  $det = [
 		// 	"details" => $this->db->last_query()
 		// ];
@@ -193,7 +192,7 @@ class Api extends CI_Model {
 
 	}
 
-	public function sendLogsToOtherSite($logs_d, $que_log = false){
+	public function sendLogsToOtherSite($logs_d, $que_log = false, $processed_by=""){
 		// If que_log is false, meaning that it will be process now
 		if($que_log === false){
 			$logs_d = (array) $logs_d;
@@ -267,7 +266,7 @@ class Api extends CI_Model {
 				"body" => json_encode($logs_d),
 				"status" => "pending",
 				"try" => 3,
-				"processed_by" => $this->session->userdata("username"),
+				"processed_by" => $processed_by,
 			);
 
 			$this->db->insert("facial_log_que", $trail);

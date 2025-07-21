@@ -142,7 +142,7 @@ class Attendance extends CI_Model {
         return $this->db->query($this->attSummQuery)->result_array();
     }
 
-    public function emp_not_yet_confirmed_list($dfrom="", $dto="", $tnt="",$employeeid="",$payroll_start="",$payroll_end="",$deptid="",$campus="",$schedule="", $company_campus="", $office="", $isactive=""){
+    public function emp_not_yet_confirmed_list($dfrom="", $dto="", $tnt="",$employeeid="",$payroll_start="",$payroll_end="",$deptid="",$campus="",$schedule="", $company_campus="", $office="", $isactive="",$empstat=""){
         $ifPayrollProcess = '';
         $wC = '';
         if($company_campus && $company_campus!="all") $wC .= " AND a.company_campus='$company_campus'";
@@ -159,6 +159,11 @@ class Attendance extends CI_Model {
         if($tnt){
             if($tnt != "trelated") $wC .= " AND a.teachingtype = '$tnt'";
             else $wC .= " AND a.teachingtype='teaching' AND a.trelated = '1'";
+        }
+
+        if($empstat)
+        {
+            $wC .= " AND a.employmentstat='$empstat'";
         }
 
         if($employeeid && $employeeid != 'all') $wC .= " AND a.employeeid='$employeeid'";
@@ -197,7 +202,7 @@ class Attendance extends CI_Model {
         return $this->db->query($this->attSummQuery)->result_array();
     }
 
-    public function emp_not_yet_confirmed_nt($dfrom="", $dto="", $tnt="",$employeeid="",$payroll_start="",$payroll_end="",$deptid="",$campus="", $company_campus="", $office="", $isactive="" ){
+    public function emp_not_yet_confirmed_nt($dfrom="", $dto="", $tnt="",$employeeid="",$payroll_start="",$payroll_end="",$deptid="",$campus="", $company_campus="", $office="", $isactive="",$empstat=""){
 
         $ifPayrollProcess = '';
         $wC = '';
@@ -215,8 +220,9 @@ class Attendance extends CI_Model {
         if($tnt){
             $wC .= " AND a.teachingtype = '$tnt' ";
         }
-        if($tnt){
-            $wC .= " AND a.teachingtype = '$tnt' ";
+
+        if($empstat){
+            $wC .= " AND a.employmentstat = '$empstat' ";
         }
       
         if($employeeid) $wC .= " AND a.employeeid='$employeeid'";
@@ -253,7 +259,7 @@ class Attendance extends CI_Model {
         return $this->db->query($this->attSummQuery)->result_array();
     }
 
-    public function emp_not_yet_confirmed_nt_list($dfrom="", $dto="", $tnt="",$employeeid="",$payroll_start="",$payroll_end="",$deptid="",$campus="",$schedule="", $company_campus="", $office="", $isactive="" ){
+    public function emp_not_yet_confirmed_nt_list($dfrom="", $dto="", $tnt="",$employeeid="",$payroll_start="",$payroll_end="",$deptid="",$campus="",$schedule="", $company_campus="", $office="", $isactive="",$empstat=""){
 
         $ifPayrollProcess = '';
         $wC = '';
@@ -271,8 +277,8 @@ class Attendance extends CI_Model {
         if($tnt){
             $wC .= " AND a.teachingtype = '$tnt' ";
         }
-        if($tnt){
-            $wC .= " AND a.teachingtype = '$tnt' ";
+        if($empstat){
+            $wC .= " AND a.employmentstat = '$empstat' ";
         }
       
         if($employeeid && $employeeid != 'all') $wC .= " AND a.employeeid='$employeeid'";
@@ -366,7 +372,7 @@ class Attendance extends CI_Model {
     }
 
 
-    public function emp_confirmed_list($dfrom="", $dto="", $tnt="", $eid="", $campus="",$schedule="", $deptid="", $sDept = "", $company_campus="", $office="", $isactive=""){
+    public function emp_confirmed_list($dfrom="", $dto="", $tnt="", $eid="", $campus="",$schedule="", $deptid="", $sDept = "", $company_campus="", $office="", $isactive="",$empstat = ""){
         $wC = "";
         $oB = "qFullname";
         $usercompany =  $this->extras->getCompanyUser();
@@ -391,6 +397,10 @@ class Attendance extends CI_Model {
         if($tnt){
             if($tnt != "trelated") $wC .= " AND a.teachingtype = '$tnt'";
             else $wC .= " AND a.teachingtype='teaching' AND a.trelated = '1'";
+        }
+
+        if($empstat){
+            $wC .= " AND a.employmentstat='$empstat'";
         }
 
         if($deptid && $deptid != "all") $wC .= " AND a.deptid='$deptid'";
@@ -498,7 +508,7 @@ class Attendance extends CI_Model {
 
 
 
-    public function emp_confirmed_nt_list($dfrom="", $dto="", $tnt="", $eid="", $campus="", $schedule="", $deptid="", $sDept="", $company_campus="", $office="", $isactive="", $xtra_wc=""){
+    public function emp_confirmed_nt_list($dfrom="", $dto="", $tnt="", $eid="", $campus="", $schedule="", $deptid="", $sDept="", $company_campus="", $office="", $isactive="", $xtra_wc="",$empstats=""){
         $wC = "";
         $oB = "qFullname";
         if($eid && $eid!="null") $wC .= " AND FIND_IN_SET (a.`employeeid`,'$eid')";    
@@ -516,6 +526,9 @@ class Attendance extends CI_Model {
 
         if($tnt){
             $wC .= " AND a.teachingtype = '$tnt' ";
+        }
+        if($empstats){
+            $wC .= " AND a.employmentstat = '$empstats'";
         }
 
         if($deptid && $deptid!="all") $wC .= " AND a.deptid='$deptid'"; 
@@ -2427,6 +2440,7 @@ class Attendance extends CI_Model {
         $timein = $timeout = $endtime = "";
         $sched_start = "";
         $q_timesheet = $this->db->query("SELECT * FROM timesheet WHERE userid = '$employeeid' AND DATE(timein) = '$date' GROUP BY timein, timeout ");
+        
         if($q_timesheet->num_rows() > 0){
            
             foreach($q_timesheet->result() as $row){
@@ -2440,8 +2454,8 @@ class Attendance extends CI_Model {
         }
 
         if($teachingtype == "nonteaching"){
-            $from_time = $t_vacant = $seq = 0;
             $sched = $this->attcompute->displaySched($employeeid,$date);
+            $from_time = $t_vacant = $seq = 0;
             $used_time = array();
             $sched_count = $sched->num_rows();
             if($sched->num_rows() > 0){
@@ -2452,7 +2466,8 @@ class Attendance extends CI_Model {
                     $earlydismissal = $sched_row->early_dismissal;
                     
                     #nilagay ko to kasi kapag kapag sakto ang schedule sa timein kinukulang ng 1minute
-                    list($login,$logout,$q,$haslog_forremarks,$used_time) = $this->attcompute->displayLogTime($employeeid,$date,$starttime,$endtime,"NEW",$seq,$absent_start,$earlydismissal,$used_time);
+                    list($login,$logout,$q,$haslog_forremarks,$used_time) = $this->attcompute->displayLogTime($employeeid,$date,$starttime,$endtime,"NEW",$seq,$absent_start,$earlydismissal,$used_time, "");
+                    
                     if($login){
                         if(date("H:i", strtotime($starttime)) == date("H:i", strtotime($login))){
                             // $t_min += 1;
@@ -2475,6 +2490,7 @@ class Attendance extends CI_Model {
                     $from_time = $sched_row->endtime;
 
                     $sched_min += round(abs(strtotime($sched_row->endtime) - strtotime($sched_row->starttime)) / 60);
+
                 }
             }
 
@@ -3174,7 +3190,37 @@ class Attendance extends CI_Model {
     }
 
 
+    public function isAttendanceAlreadyConfirmed($employeeid, $dfrom, $dto) {
+        $tnt = $this->extensions->getEmployeeTeachingType($employeeid);
+        $table = ($tnt == "nonteaching") ? "attendance_confirmed_nt" : "attendance_confirmed";
     
+        return $this->db->query("SELECT id FROM $table a
+                                 WHERE a.employeeid = '$employeeid' 
+                                 AND ( ('$dfrom' BETWEEN cutoffstart AND cutoffend) 
+                                 OR  ('$dto' BETWEEN cutoffstart AND cutoffend))");
+    }
+
+    public function getAbsentPerDay($from_date='',$to_date='',$empid='',$table=''){
+        $qdate = $this->attcompute->displayDateRange($from_date, $to_date);
+        $dateList = array();
+
+        // Globals::pd($qdate);die;
+        foreach ($qdate as $rdate) {
+            $date = $rdate->dte;
+            if ($table == 'employee_attendance_nonteaching'){
+                $qAbsent = $this->db->query("SELECT absent FROM $table WHERE employeeid = '$empid' AND DATE(date) = '$date'");
+                if ($qAbsent->num_rows() > 0){
+                    if ($qAbsent->row()->absent != '' && $qAbsent->row()->absent != '--') $dateList[$date] = 1;
+                }
+            }else{
+                $qAbsent = $this->db->query("SELECT absent_lec,absent_lab,absent_overload FROM $table WHERE employeeid = '$empid' AND DATE(date) = '$date'");
+                if ($qAbsent->num_rows() > 0){
+                    if (($qAbsent->row()->absent_lec != '' && $qAbsent->row()->absent_lec != '--') || ($qAbsent->row()->absent_lab != '' && $qAbsent->row()->absent_lab != '--') || ($qAbsent->row()->absent_overload != '' && $qAbsent->row()->absent_overload != '--')) $dateList[$date] = 1;
+                }
+            }
+        }
+        return $dateList;
+    }
     
 
 }

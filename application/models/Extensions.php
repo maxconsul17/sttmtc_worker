@@ -529,6 +529,46 @@ class Extensions extends CI_Model {
 		}
 	}
 
+	/* ryschristian 2024
+	 * isApplicationProcessedAndApproved function check if the online application is already approved and processed in payroll 
+	 * 
+	 */
+	public function isApplicationProcessedAndApproved($app_id="", $tablename1="", $tablename2="") {
+		
+		if ($tablename1 === "ot_app" && $tablename2 === "ot_app_emplist") {
+			$column_from = 'dfrom';
+			$column_to = 'dto';
+		} else {
+			$column_from = 'datefrom';
+			$column_to = 'dateto';
+		}
+	
+		$application = $this->db->query("SELECT b.employeeid, a.$column_from, a.$column_to
+										  FROM $tablename1 a
+										  LEFT JOIN $tablename2 b ON a.id = b.base_id
+										  WHERE b.base_id = '$app_id'
+										  AND a.status = 'APPROVED'")->row();
+		
+		if ($application) {
+			$employeeId = $application->employeeid;
+			$dateFrom = $application->$column_from;
+			$dateTo = $application->$column_to;
+	
+			$isProcessed = $this->db->query("SELECT 1 FROM payroll_computed_table p
+											 WHERE p.employeeid = '$employeeId'
+											 AND (('$dateFrom' BETWEEN p.cutoffstart AND p.cutoffend)
+												  OR ('$dateTo' BETWEEN p.cutoffstart AND p.cutoffend)
+												  OR (p.cutoffstart BETWEEN '$dateFrom' AND '$dateTo')
+												  OR (p.cutoffend BETWEEN '$dateFrom' AND '$dateTo'))
+											 AND p.status = 'PROCESSED'
+											 LIMIT 1")->row();
+	
+
+			return ($isProcessed !== null);
+		}
+		return false; 
+	}
+
 	public function getSpecialVoucherDataForAlphalist(){
 		$utwc = '';
         $utdept = $this->session->userdata("department");
@@ -685,7 +725,7 @@ class Extensions extends CI_Model {
 	}
 
 	public function getPayrollCutoffConfigArr($dfrom, $dto){
-		$cutoff = explode("-", $dtr_cutoff);
+		// $cutoff = explode("-", $dtr_cutoff);
 		$query_date = $this->db->query("SELECT * FROM cutoff a INNER JOIN payroll_cutoff_config b ON a.`id` = b.`baseid` WHERE CutoffFrom = '$dfrom' AND CutoffTo = '$dto' ");
 		if($query_date->num_rows() > 0) return array($query_date->row()->startdate, $query_date->row()->enddate);
 		else return array(null,null);
@@ -704,7 +744,7 @@ class Extensions extends CI_Model {
 	}
 
 	public function getDTRCutoffConfigPayslip($dfrom, $dto){
-		// $cutoff = explode("-", $dtr_cutoff);
+		$cutoff = explode("-", $dtr_cutoff);
 		$query_date = $this->db->query("SELECT * FROM cutoff a INNER JOIN payroll_cutoff_config b ON a.`id` = b.`baseid` WHERE startdate = '$dfrom' AND enddate = '$dto' ");
 		if($query_date->num_rows() > 0){
 			$cutoffdate = (date('F Y',strtotime($query_date->row()->CutoffFrom)) == date('F Y',strtotime($query_date->row()->CutoffTo))) ? date('F d',strtotime($query_date->row()->CutoffFrom)).' -  '.date('d, Y',strtotime($query_date->row()->CutoffTo)) : date('F d',strtotime($query_date->row()->CutoffFrom)).' -  '.date('F d, Y',strtotime($query_date->row()->CutoffTo));
@@ -806,7 +846,7 @@ class Extensions extends CI_Model {
 	}
 
 	public function getEmployeeTeachingType($employeeid){
-		$q_type = $this->db->query("SELECT * FROM employee WHERE employeeid = '$employeeid' ");
+		$q_type = $this->db->query("SELECT teachingtype FROM employee WHERE employeeid = '$employeeid' ");
 		if($q_type->num_rows() > 0) return Globals::_e($q_type->row()->teachingtype);
 		else return false;
 	}
@@ -892,8 +932,8 @@ class Extensions extends CI_Model {
     	elseif($table == "overtime") $tbl = "ot_app_emplist";
     	elseif($table == "ob") $tbl = "ob_app_emplist";
     	elseif($table == "changesched") $tbl = "change_sched_app_emplist";
-    	elseif($table == "servicecredit") $tbl = "sc_app_emplist";
-    	elseif($table == "useservicecredit") $tbl = "sc_app_use_emplist";
+    	elseif($table == "servicecredit") $tbl = "sc_app_emplists";
+    	elseif($table == "useservicecredit") $tbl = "sc_app_use_emplists";
     	elseif($table == "seminar") $tbl = "seminar_app_emplist";
     	elseif($table == "substitute") $tbl = "substitute_app_emplist";
 		$issecond = false;
@@ -1261,7 +1301,7 @@ class Extensions extends CI_Model {
 			if(($utdept && $utdept != 'all') && ($utoffice && $utoffice != 'all')) $utwc = " AND  (FIND_IN_SET (a.deptid, '$utdept') OR FIND_IN_SET (a.office, '$utoffice'))";
 		}
 		
-		return $this->db->query("SELECT CONCAT(a.employeeid, ' - ', a.lname, ', ', a.fname, ' ', a.mname) AS fullname, a.employeeid FROM employee a $where AND a.isactive='1' $utwc order by lname, fname, mname $lc")->result_array();
+		return $this->db->query("SELECT CONCAT(a.employeeid, ' - ', a.lname, ', ', a.fname, ' ', a.mname) AS fullname, a.employeeid FROM employee a $where $utwc order by lname, fname, mname $lc")->result_array();
 	}
 
 	public function loadTeachingEmployeeSelect2AccountType($where = '', $lc = '', $accounttype = '', $usertype= ''){
@@ -1528,6 +1568,10 @@ class Extensions extends CI_Model {
     	return $this->db->query("SELECT * FROM employee WHERE employeeid = '$eid'")->num_rows();
     }
 
+	public function is_faculty_exists($fid, $lname, $fname, $email, $bdate){
+    	return $this->db->query("SELECT * FROM employee WHERE (idnumber = '$fid') OR (lname = '$lname' AND fname = '$fname' AND email = '$email' AND bdate = '$bdate')")->row()->employeeid;
+    }
+
     public function getCampusDescriptionByAimsdept($aimsdept="", $employeeid=""){
 		$q_sched = $this->db->query("SELECT campus FROM employee_schedule_history WHERE aimsdept = '$aimsdept' AND employeeid = '$employeeid'");
 		if($q_sched->num_rows() > 0){
@@ -1538,13 +1582,19 @@ class Extensions extends CI_Model {
 	}
 
 	public function getLatestDateActive($employeeid, $date){
-    	$query = $this->db->query("SELECT dateactive FROM employee_schedule_history WHERE employeeid = '$employeeid' AND DATE(dateactive) <= DATE(DATE_SUB('$date',INTERVAL 1 DAY)) ORDER BY dateactive DESC LIMIT 1");
+    	$query = $this->db->query("SELECT dateactive FROM employee_schedule_history WHERE employeeid = '$employeeid' AND DATE(dateactive) <= '$date' ORDER BY dateactive DESC LIMIT 1");
+    	if($query->num_rows() > 0) return $query->row()->dateactive;
+    	else return false;
+    }
+
+	public function getLatestDateActive2($employeeid, $date){
+    	$query = $this->db->query("SELECT dateactive FROM employee_schedule_history WHERE employeeid = '$employeeid' AND DATE(dateactive) <= '$date' AND is_temporary != '1' ORDER BY dateactive DESC LIMIT 1");
     	if($query->num_rows() > 0) return $query->row()->dateactive;
     	else return false;
     }
 
     public function is_teaching_related($employeeid){
-    	return $this->db->query("SELECT * FROM employee WHERE teachingtype = 'nonteaching' AND trelated = '1' AND employeeid = '$employeeid'")->num_rows();
+    	return $this->db->query("SELECT * FROM employee WHERE teachingtype = 'teaching' AND trelated = '1' AND employeeid = '$employeeid'")->num_rows();
     }
 
     public function is_employee_resigned($date, $employeeid){
@@ -1773,5 +1823,87 @@ class Extensions extends CI_Model {
 		$result = $this->db->query("SELECT `type` FROM ob_type_list WHERE id = (SELECT obtypes FROM ob_app WHERE applied_by = '$employeeid' AND datefrom = '$date' AND `status` = 'APPROVED' LIMIT 1)");
 		return $result->num_rows() > 0 ? $result->row()->type : '';
 	}
+
+	public function belongsToMainCampus($employeeid = ""){
+		$campus_code = $this->db->campus_code;
+		$query = $this->db->query("SELECT * FROM employee WHERE employeeid = '$employeeid' AND campusid = '$campus_code'");
+		return $query->num_rows() > 0;
+	}
+
+	public function getAllTable($table=''){
+		return $this->db->query("SELECT * FROM $table")->result();
+	}
+
+	public function getEmployeeSpouseName($employee_id){
+		$spouse = $this->db->query("SELECT CONCAT(spouse_lname, ' ', spouse_fname, ',' , spouse_mname) AS fullname FROM employee WHERE employeeid = '$employee_id' ");
+		if($spouse->num_rows() > 0){
+			return $spouse->row()->fullname;
+		}else{
+			return false;
+		}
+	}
+
+	/**
+	 * Get the count of approved leave applications for a specific employee.
+	 *
+	 * This method returns the number of leave records matching the provided criteria,
+	 * filtered by employee ID, leave type, status, and date boundaries.
+	 *
+	 * @param string $employeeId The ID of the employee.
+	 * @param string $dateFrom   The start date to check against the leave's `datefrom`.
+	 * @param string $dateTo     The end date to check against the leave's `dateto`.
+	 * @param string $leaveType  The type of leave (e.g., Sick, Vacation).
+	 * @param string $status     The leave application status to filter by (default: "APPROVED").
+	 *
+	 * @return float The total count of matching leave applications.
+	 */
+	public function getApprovedLeaveCount(
+		string $employeeId,
+		string $dateFrom = '',
+		string $dateTo = '',
+		string $leaveType,
+		string $status = 'APPROVED'
+	): float {
+		$where = [];
+		$params = [];
+
+		$where[] = "a.employeeid = ?";
+		$params[] = $employeeId;
+
+		$where[] = "b.status = ?";
+		$params[] = $status;
+
+		$where[] = "b.type = ?";
+		$params[] = $leaveType;
+
+		if (!empty($dateFrom) && $dateFrom != "0000-00-00") {
+			$where[] = "? <= b.datefrom";
+			$params[] = $dateFrom;
+		}
+
+		if (!empty($dateTo) && $dateTo != "0000-00-00") {
+			$where[] = "? >= b.dateto";
+			$params[] = $dateTo;
+		}
+
+		$whereSql = implode("\nAND ", $where);
+
+		$sql = "
+			SELECT SUM(nodays) AS overall_total
+			FROM (
+				SELECT DISTINCT b.id, b.nodays
+				FROM leave_app_emplist AS a
+				LEFT JOIN leave_app_base AS b ON b.id = a.base_id
+				WHERE $whereSql
+			) AS sub
+		";
+
+		$query = $this->db->query($sql, $params);
+		$result = $query->row_array();
+
+		return (float) ($result['overall_total'] ?? 0);
+	}
+
+
 
 } //endoffile

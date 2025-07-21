@@ -3,7 +3,7 @@ defined('BASEPATH') OR exit('No direct script access allowed');
 
 class Worker_model extends CI_Model {
 
-    public $tables = ['report_list','recompute_list','payroll_list','attendance_list','employee_to_calculate','facial_log_que'];
+    public $tables = ['report_list','recompute_list','payroll_list','attendance_list','employee_to_calculate','facial_log_que', 'upload_list', 'upload_list_data'];
 
 	public function fetch_emp_calculate()
 	{           
@@ -330,7 +330,7 @@ class Worker_model extends CI_Model {
     }
 
     public function getCalculateJob(){
-        $result = $this->db->where("(status = 'pending' OR status = 'ongoing') AND try > 0")
+        $result = $this->db->where("(status = 'pending' OR status = 'ongoing') AND try > 0 AND att_list_id is NULL")
             ->get($this->tables[4])
             ->row();
         return $result ? $result : false;
@@ -374,4 +374,74 @@ class Worker_model extends CI_Model {
         $this->db->insert("for_trail", ["details"=>$data]);
     }
 
+    public function getUploadJob(){
+        $result = $this->db->where("(status = 'pending')")
+            ->order_by('timestamp', 'ASC')
+            ->get($this->tables[6])
+            ->row();
+     
+        return $result ? $result : false;
+    }
+
+    public function getUploadDataJob() {
+        $result = $this->db
+            ->where("(status = 'pending' OR status = 'ongoing')")
+            ->order_by('timestamp', 'ASC')
+            ->limit(1)
+            ->get($this->tables[7])
+            ->row();
+            
+        return $result ? $result : false;
+    }
+
+
+    public function uploadedDataStatus($upload_id){
+        $this->db->where("id", $upload_id);
+        $this->db->set("status", "pending");
+        return $this->db->get("upload_list_data")->num_rows();
+    }
+
+
+        public function updateUploadStatus($upload_id, $status="done"){
+        $this->db->where("id", $upload_id);
+        $this->db->set("status", $status);
+        if($status == "done"){
+            $this->db->set("done_time", $this->getServerTime());
+        }
+        $this->db->update("upload_list");
+    }
+
+
+    public function updateUploadDataStatus($upload_id, $status="done"){
+        $this->db->where("id", $upload_id);
+        $this->db->set("status", $status);
+        $this->db->update("upload_list_data");
+    }
+
+    public function updateUploadDataErrCode($upload_id, $err_code=0){
+        $this->db->where("id", $upload_id);
+        $this->db->set("err_code", $err_code);
+        $this->db->update("upload_list_data");
+    }
+    public function updateConfrimAttStatus($empid, $base_id)
+    {
+        $this->db->where("att_list_id", $base_id);    
+        $this->db->where("employeeid", $empid);       
+        $this->db->set("status", "done");            
+        $this->db->update("employee_to_calculate");   
+    }
+
+    public function saveFailedUploadedLogs($base_id, $log_date, $err_code, $employee_id) {
+        $data = array(
+            'base_id'      => $base_id,
+            'err_code'     => $err_code,
+            'employee_id'  => $employee_id,
+            'log_date'     => $log_date
+        );
+
+        return $this->db->insert('upload_list_data_error', $data);
+    }
+
+
+    
 }

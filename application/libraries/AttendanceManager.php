@@ -76,7 +76,7 @@ class AttendanceManager
         $employeeids = explode(',',$data["empid"]);
 		
         foreach ($employeeids as $employeeid) {
-            $this->confirmAttendance($data);
+            $this->confirmAttendance($data, $job_det->id);
         }
 		
         $this->worker_model->updateAttendanceStatus($job_det->id, "done");
@@ -101,25 +101,30 @@ class AttendanceManager
 					$this->api->updateCalculateTagging($employeeid, $dfrom, $dto);
 
 					$date_range = $this->attcompute->displayDateRange($dfrom, $dto);
-					// Globals::pd($date_range);die;
-					foreach($date_range as $date){
-
-						// REPROCESS TIMESHEET BASED ON SCHEDULE
-						$this->timesheet->reprocessFacialLogBySchedule($employeeid, $date->dte);
-
-						$isteaching = $this->employee->getempteachingtype($employeeid);
-						$teaching_related = $this->employee->isTeachingRelated($employeeid);
-						if($isteaching){
-							$this->employeeAttendance->employeeAttendanceTeaching($employeeid, $date->dte);
-						}else{
-							if($teaching_related){
+					Globals::pd($date_range);
+					foreach($date_range as $date) {
+						try {
+							echo "Processing attendance for employee: $employeeid on date: {$date->dte}\n";
+							$this->timesheet->reprocessFacialLogBySchedule($employeeid, $date->dte);
+							
+							$isteaching = $this->employee->getempteachingtype($employeeid);
+							$teaching_related = $this->employee->isTeachingRelated($employeeid);
+							
+							if($isteaching) {
 								$this->employeeAttendance->employeeAttendanceTeaching($employeeid, $date->dte);
-							}else{
-								$this->employeeAttendance->employeeAttendanceNonteaching($employeeid, $date->dte);
+							} else {
+								if($teaching_related) {
+									$this->employeeAttendance->employeeAttendanceTeaching($employeeid, $date->dte);
+								} else {
+									$this->employeeAttendance->employeeAttendanceNonteaching($employeeid, $date->dte);
+								}
 							}
+						} catch (Exception $e) {
+							error_log("Error processing date {$date->dte}: " . $e->getMessage());
+							continue; // Skip to next date instead of breaking
 						}
 					}
-					
+										
 					// UPDATE TASK STATUS
 					$filter = [
 						"employeeid" => $employeeid,
@@ -203,8 +208,10 @@ class AttendanceManager
 		return $httpCode == 200;
     }
 
-    public function confirmAttendance($data){
+    public function confirmAttendance($data, $base_id){
+	
 		$usertype   = 'ADMIN';
+
 		// $toks 		= $this->input->post("toks");
         // $data 		= $this->input->post();
         // foreach($data as $key => $val){
@@ -223,17 +230,30 @@ class AttendanceManager
         	$teaching_related = $this->employee->isTeachingRelated($employeeid);
         	if($teaching_type == "teaching" || $teaching_related){
         		$attendance = $this->employeeAttendance->getAttendanceTeaching($employeeid, $dfrom, $dto);
-        		$off_lec_total = $off_lab_total = $off_admin_total = $off_overload_total = $twr_lec_total = $twr_lab_total = $twr_admin_total = $twr_overload_total = $teaching_overload_total = $ot_regular_total = $ot_restday_total = $ot_holiday_total = $lateut_lec_total = $lateut_lab_total = $lateut_admin_total = $lateut_overload_total = $absent_lec_total = $absent_lab_total = $absent_admin_total = $service_credit_total = $cto_total = $holiday_lec_total = $holiday_lab_total = $holiday_admin_total = $holiday_overload_total = $holiday_total = $date_list_absent = $total_absent = $vacation_total = $emergency_total = $other_total = $sick_total =  0;
+        		$off_lec_total = $off_lab_total = $off_admin_total = $off_overload_total = $twr_lec_total = $twr_lab_total = $twr_admin_total = $twr_overload_total = $teaching_overload_total = $ot_regular_total = $ot_restday_total = $ot_holiday_total = $lateut_lec_total = $lateut_lab_total = $lateut_admin_total = $lateut_overload_total = $absent_lec_total = $absent_lab_total = $absent_admin_total = $service_credit_total = $cto_total = $holiday_lec_total = $holiday_lab_total = $holiday_admin_total = $holiday_overload_total = $holiday_total = $date_list_absent = $total_absent = $vacation_total = $emergency_total = $other_total = $sick_total = $tdr_admin =  0;
         		$daily_present = $daily_absent = "";
+    				
     			foreach ($attendance as $att_date) {
 		            $counter = 0;
 		            $rowspan = 0;
 		            $is_absent = 0;
 					$isHoliday= false;
 		            $date = $daily_lec = $daily_lab = $daily_admin = $daily_overload = $daily_overtime_mode =  "";
-		            $daily_lec_absent = $daily_lab_absent = $daily_admin_absent = $daily_overload_absent = $daily_lec_late = $daily_lab_late = $daily_admin_late = $daily_overload_late = $daily_lec_undertime = $daily_lab_undertime = $daily_admin_undertime = $daily_overload_undertime = $daily_overtime = $daily_undertime = $daily_late = $daily_absents = $daily_overtime_amount =  0;
+		            $daily_lec_absent = $daily_lab_absent = $daily_admin_absent = $daily_overload_absent = $daily_lec_late = $daily_lab_late = $daily_admin_late = $daily_overload_late = $daily_lec_undertime = $daily_lab_undertime = $daily_admin_undertime = $daily_overload_undertime = $daily_overtime = $daily_undertime = $daily_late = $daily_absents = $daily_overtime_amount = 0;
 		            $ot_list = array();
 					
+					$has_twr = false;
+					foreach ($att_date as $log_entry) {
+						if ($log_entry->off_admin && $log_entry->off_admin != '--' && $log_entry->off_admin != '') {
+							$has_twr = true;
+							break;
+						}
+					}
+		
+					if ($has_twr) {
+						$tdr_admin++;
+					}
+
 		            foreach ($att_date as $key => $value) {
 		            	$rowspan = $value->rowspan;
 		            	$leave_project = 0;
@@ -318,7 +338,7 @@ class AttendanceManager
 		                $holiday_admin_total += $this->attcompute->exp_time($value->holiday_admin);
 		                $holiday_overload_total += $this->attcompute->exp_time($value->holiday_overload);
 
-						if(($value->holiday || !empty($value->holiday_type))&& $counter == 0 ){
+		                if(($value->holiday || !empty($value->holiday_type))&& $counter == 0 ){
 							if($value->holiday_type != 'OTHERS' && $value->absent == "") {
 								$isHoliday= true;
 								$holiday_total++;
@@ -402,8 +422,8 @@ class AttendanceManager
 		                	}
 		                }
 		                $counter++;
+
 		            }
-		            
 
 		            if($is_absent > 0 && $is_absent == count($att_date) && ($rowspan != 0 && $rowspan != NULL && $rowspan != "")){
 		            	$total_absent++;
@@ -466,9 +486,10 @@ class AttendanceManager
 
 					// echo "<pre>";print_r($absent_admin_total);echo "<pre>";die;
             		$res = $this->CI->db->query("INSERT INTO attendance_confirmed SET 
-            			employeeid = '$employeeid',
+             			employeeid = '$employeeid',
             			cutoffstart = '$dfrom',
             			cutoffend = '$dto',
+						tdr_admin='$tdr_admin', 
             			overload = '',
             			substitute = '',
             			workhours_lec = '$off_lec_total',
@@ -519,7 +540,7 @@ class AttendanceManager
 	                }
             	}
         	}else{
-        		if(!isset($workhours_arr['']['ADMIN']['work_hours'])) $workhours_arr['']['ADMIN']['work_hours'] = 0;
+				if(!isset($workhours_arr['']['ADMIN']['work_hours'])) $workhours_arr['']['ADMIN']['work_hours'] = 0;
 		        if(!isset($workhours_arr['']['ADMIN']['late_hours'])) $workhours_arr['']['ADMIN']['late_hours'] = 0;
 		        if(!isset($workhours_arr['']['ADMIN']['deduc_hours'])) $workhours_arr['']['ADMIN']['deduc_hours'] = 0;
 		        if(!isset($workhours_arr['']['ADMIN']['leave_project'])) $workhours_arr['']['ADMIN']['leave_project'] = 0;
@@ -533,9 +554,14 @@ class AttendanceManager
 		        }
         		$attendance = $this->employeeAttendance->getAttendanceNonteaching($employeeid, $dfrom, $dto);
         		$not_included_ol = array("ABSENT", "EL", "VL", "SL", "CORRECTION");
-				$off_time_in = $off_time_out = $off_time_total = $actlog_time_in = $actlog_time_out = $terminal = $twr_total = $ot_regular_total = $ot_restday_total = $ot_holiday_total = $late_total = $undertime_total = $vl_deduc_late_total = $vl_deduc_undertime_total = $absent_data_total = $service_credit_total = $cto_credit_total = $vacation_total = $sick_total = $other_total = $emergency_total = $holiday_total = $total_holiday = $suspension_total = $total_suspension = $total_absent = $workdays = $total_late_deduc = $late_deduc =  0;
+				$off_time_in = $off_time_out = $off_time_total = $actlog_time_in = $actlog_time_out = $terminal = $twr_total = $ot_regular_total = $ot_restday_total = $ot_holiday_total = $late_total = $undertime_total = $vl_deduc_late_total = $vl_deduc_undertime_total = $absent_data_total = $service_credit_total = $cto_credit_total = $vacation_total = $sick_total = $other_total = $emergency_total = $holiday_total = $total_holiday = $suspension_total = $total_suspension = $total_absent = $workdays = $total_late_deduc = $has_flexible = $late_deduc =  0;
 				$daily_overtime_amount = 0;
 				$daily_absent = "";
+
+				$employee_shift_days = $this->employeeAttendance->fetchEmployeeShift($employeeid);
+
+				$twr_total_flex = 0;
+				$absent_flex = 0;
 
 				foreach ($attendance as $att_date) {
 					$counter = $daily_overtime = $daily_undertime = $daily_late = $daily_absents = $daily_overtime_amount =  0;
@@ -544,15 +570,20 @@ class AttendanceManager
 					$date = $daily_overtime_mode = "";
 					$isHoliday = false;
 					$ot_list = array();
+					
 					foreach ($att_date as $key => $value) {
 						$date = $value->date;
 						$leave_project = 0;
 						$rowspan = $value->rowspan;
+						$total_wrh = $this->attcompute->getTotalWorkRenderedHoursPerDate($date, $employeeid);
+						$twr_total += $this->attcompute->exp_time($value->twr);
+						$has_flexible += $value->is_flexible ? 1 : 0;
+
 						if($counter == 0){
-							$twr_total += $this->attcompute->exp_time($value->twr);
 							$ot_regular_total += $this->attcompute->exp_time($value->ot_regular);
 							$ot_restday_total += $this->attcompute->exp_time($value->ot_restday);
 							$ot_holiday_total += $this->attcompute->exp_time($value->ot_holiday);
+
 							if($value->other != "" && $value->other != "--" && (!in_array($value->other, $not_included_ol) && $value->other && $value->other!="DIRECT")){
 								if($other_total == 0.5){
 									$other_total += 0.5;
@@ -567,19 +598,20 @@ class AttendanceManager
 							$daily_overtime += $this->attcompute->exp_time($value->ot_holiday) + $this->attcompute->exp_time($value->ot_restday) + $this->attcompute->exp_time($value->ot_regular);
 							
 							if (!empty($value->holiday) || !empty($value->holiday_type)) { 
-								if ($value->holiday == 3 || $value->holiday == '3') { 
+								$is_suspension = $this->extras->isHolidaySuspension($value->holiday);
+								if ($is_suspension) { 
 									$suspension_total++;
-									$total_suspension += $this->attcompute->exp_time($value->twr);
+									$total_suspension += $this->attcompute->exp_time($total_wrh);
 								} else {
-									if($value->absent == ""){
+									if($value->holiday_type != 'OTHERS' && $value->absent == ""){
 										$holiday_total++;
 										$isHoliday = true; 
-										$total_holiday += $this->attcompute->exp_time($value->twr);
+										$total_holiday += $this->attcompute->exp_time($total_wrh);
 									}
 								}
 							}
 							
-				
+					
 							$off_time_total += $this->attcompute->exp_time($value->off_time_total);
 							if($value->vl != "" && $value->vl != "--"){
 								$vacation_total += $value->vl;
@@ -597,8 +629,22 @@ class AttendanceManager
 						}
 
 						
-						$ot_list_tmp = $this->attcompute->getOvertime($employeeid,$value->date,true,$value->holiday_type);
+						//Check if has schedule
+						$getSched = $this->attcompute->displaySched($employeeid,$value->date)->result();
+						$hasSched = count($getSched) > 0 ? true : false;
+
+
+						// For flexible
+						if($value->is_flexible && $this->attcompute->exp_time($value->twr) > 0 && $employee_shift_days > 0 && $hasSched){
+							$twr_total_flex += $this->attcompute->exp_time($off_time_total);
+							$employee_shift_days --;
+						}
+
+						$ot_list_tmp = $this->attcompute->getOvertime($employeeid,$value->date,$hasSched,$value->holiday_type);
+
                     	$ot_list = $this->attcompute->constructOTlist($ot_list,$ot_list_tmp);
+
+
                     	
                     	$daily_undertime += $this->attcompute->exp_time($value->undertime);
                     	$daily_late += $this->attcompute->exp_time($value->late);
@@ -620,13 +666,15 @@ class AttendanceManager
 							$total_late_deduc = $this->attcompute->sec_to_hm($late_deduc);
 						}
 
-				       // dont include add the twr when holiday is true
+					
+				
+						// dont include add the twr when holiday is true
 						if(!$isHoliday){
 							$workhours_arr['']['ADMIN']['work_hours'] += $this->attcompute->exp_time($value->twr);
 						} 
-			            $workhours_arr['']['ADMIN']['late_hours'] += $this->attcompute->exp_time($value->late) + $this->attcompute->exp_time($value->undertime);
-			            $workhours_arr['']['ADMIN']['deduc_hours'] += $this->attcompute->exp_time($value->absent);
-			            $workhours_arr['']['ADMIN']['leave_project'] += $leave_project;
+						$workhours_arr['']['ADMIN']['late_hours'] += $this->attcompute->exp_time($value->late) + $this->attcompute->exp_time($value->undertime);
+						$workhours_arr['']['ADMIN']['deduc_hours'] += $this->attcompute->exp_time($value->absent);
+						$workhours_arr['']['ADMIN']['leave_project'] += $leave_project;
 
 						$late_total += $this->attcompute->exp_time($value->late);
 						$undertime_total += $this->attcompute->exp_time($value->undertime);
@@ -638,6 +686,7 @@ class AttendanceManager
 						if($value->cto != "" && $value->cto != "--") $cto_credit_total +=  $this->attcompute->exp_time($value->cto);
 						$counter++;
 					}
+
 
 					if($is_absent > 0 && $is_absent == count($att_date) && ($rowspan != 0 && $rowspan != NULL && $rowspan != "")){
 		            	$total_absent++;
@@ -656,10 +705,10 @@ class AttendanceManager
 
 					$this->CI->db->query("DELETE FROM employee_attendance_detailed WHERE employeeid='$employeeid' AND sched_date='$date'");
 
-					$ot_with25 = $this->attendance_model->loadTotalOTPerDate($employeeid,$date,'total_ot_with_25');
-					$ot_without25 = $this->attendance_model->loadTotalOTPerDate($employeeid,$date,'total_ot_without_25');
-
-		            $save_data = array(
+					$ot_with25 = $this->attcompute->loadTotalOTPerDate($employeeid,$date,'total_ot_with_25');
+					$ot_without25 = $this->attcompute->loadTotalOTPerDate($employeeid,$date,'total_ot_without_25');
+		            
+					$save_data = array(
 	                    "employeeid" => $employeeid,
 	                    "sched_date" => $date,
 	                    "overtime"   =>  ($daily_overtime ? $this->attcompute->sec_to_hm($daily_overtime) : ''),
@@ -681,26 +730,43 @@ class AttendanceManager
 				
 				$query = $this->CI->db->query("SELECT * FROM attendance_confirmed_nt WHERE cutoffstart='$dfrom' AND cutoffend='$dto' AND employeeid='$employeeid'");
 				if($query->num_rows() == 0){
-					$base_id = "";
+						$base_id = "";
 					$ot_regular_total = $ot_regular_total ? $this->attcompute->sec_to_hm($ot_regular_total) : '';
             		$ot_restday_total = $ot_restday_total ? $this->attcompute->sec_to_hm($ot_restday_total) : '';
             		$ot_holiday_total = $ot_holiday_total ? $this->attcompute->sec_to_hm($ot_holiday_total) : '';
+            		$workhours_rendered_total = $twr_total ? $this->attcompute->sec_to_hm($twr_total) : '';
 
             		$late_total = $late_total ? $this->attcompute->sec_to_hm($late_total) : '';
             		$total_suspension = $total_suspension ? $this->attcompute->secondsToDecimalHours($total_suspension) : '';
             		$undertime_total = $undertime_total ? $this->attcompute->sec_to_hm($undertime_total) : '';
             		$absent_data_total = $absent_data_total ? $this->attcompute->sec_to_hm($absent_data_total) : '';
 
-					$totalOTWith25Formatted = $this->attendance_model->loadTotalOT($employeeid,$startdate,$enddate,"total_ot_with_25");
-					$totalOTWithout25Formatted = $this->attendance_model->loadTotalOT($employeeid,$startdate,$enddate,"total_ot_without_25");
+					$totalOTWith25Formatted = $this->attcompute->loadTotalOT($employeeid,$startdate,$enddate,"total_ot_with_25");
+					$totalOTWithout25Formatted = $this->attcompute->loadTotalOT($employeeid,$startdate,$enddate,"total_ot_without_25");
 
 					$workdays = $workdays - $holiday_total - $suspension_total;
+					$has_flexible = $has_flexible > 0;
+
+					// Sa flexible to para ma change yung 
+					// workdays, work hours rendered at total absent
+					if($has_flexible > 0){
+						$workhours_rendered_total = $this->attcompute->sec_to_hm($twr_total_flex);
+						$total_absent = $employee_shift_days;
+
+						// Kapag may absent kunin lang kung ilang days yung sched flexible nya minus sa absent
+						// yun yung work days nya para 12 days parin total ng sched nya.
+						$workdays = $this->employeeAttendance->fetchEmployeeShift($employeeid);
+						if($total_absent > 0){
+							$workdays = abs($workdays - $total_absent);
+						}
+					}
 
 					$res = $this->CI->db->query("INSERT INTO attendance_confirmed_nt SET 
             			employeeid = '$employeeid',
             			cutoffstart = '$dfrom',
             			cutoffend = '$dto',
             			workdays = '$workdays',
+						workhours = '$workhours_rendered_total',
             			otreg = '$ot_regular_total',
             			otrest = '$ot_restday_total',
             			othol = '$ot_holiday_total',
@@ -726,7 +792,9 @@ class AttendanceManager
             			scleave = '$service_credit_total',
             			cto = '$cto_credit_total',
 						total_ot_with_25 = '$totalOTWith25Formatted',
-						total_ot_without_25 = '$totalOTWithout25Formatted'");
+						total_ot_without_25 = '$totalOTWithout25Formatted',
+						has_flexible = '$has_flexible'
+					");
 					// echo "<pre>";print_r($this->CI->db->last_query());
             		if($res){
             			$base_id = $this->CI->db->insert_id();
@@ -750,6 +818,7 @@ class AttendanceManager
             		}
 				}
         	}
+			$this->worker_model->updateConfrimAttStatus($employeeid, $base_id);
         } // foreach (explode(",", $emp_list) as $employeeid)
         return true;
 	}

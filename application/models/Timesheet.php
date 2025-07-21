@@ -362,6 +362,215 @@ class Timesheet extends CI_Model {
     return $this->db->insert("timesheet", $log_data);
   }
 
+  public function reprocessFacialLogByScheduleTeaching($emp_id, $date) {
+    // store used pair of logs
+    $used_time = array();
+
+    // Get employee schedule
+    $emp_sched = $this->attcompute->displaySched($emp_id, $date);
+
+    if ($emp_sched->num_rows() > 0) {
+        // Delete all timesheet data from facial
+        $checklog_q = $this->db->query("DELETE FROM timesheet WHERE userid = '$emp_id' AND DATE(timein) = '$date' AND otype = 'Facial'");
+        $first_sched = true;
+        $last_timein = $last_timeout = "";
+        $has_last_timein = $has_last_timeout = "";
+        $emp_schedule = $emp_sched->result_array();
+        
+        foreach ($emp_schedule as $key => $rsched) {
+            $timein = "";
+            $timeout = "";
+            $device_key = "";
+            
+            $sched_start = $date . " " . $rsched["starttime"];
+            $sched_end = $date . " " . $rsched["endtime"];
+            $early_dismissal = $date . " " . $rsched["early_dismissal"];
+            $absent_start = $date . " " . $rsched["absent_start"];
+            
+            $prior_sched_start = isset($emp_schedule[$key + 1]) 
+                ? $date . " " . $emp_schedule[$key + 1]["starttime"] 
+                : "";
+
+            $last_sched_end = isset($emp_schedule[$key - 1]) 
+                ? $date . " " . $emp_schedule[$key - 1]["endtime"] 
+                : "";
+
+            $order_by = $first_sched ? " ORDER BY time ASC" : " ORDER BY time_diff ASC";
+            $order_by_timeout = $first_sched ? " ORDER BY time_diff ASC" : " ORDER BY time_diff DESC";
+            
+            // Consolidated query for time-in and time-out logs
+            $queries = [
+                'timein' => "
+                    SELECT 
+                        FROM_UNIXTIME(FLOOR(`time` / 1000)) AS logtime,
+                        ABS(TIME_TO_SEC(TIMEDIFF(FROM_UNIXTIME(FLOOR(`time` / 1000)), '$sched_start'))) AS time_diff,
+                        deviceKey
+                    FROM facial_Log
+                    WHERE employeeid = '$emp_id'
+                      AND DATE(FROM_UNIXTIME(FLOOR(`time` / 1000))) = '$date'
+                      ". ($first_sched ? " AND FROM_UNIXTIME(FLOOR(`time` / 1000)) <= '$sched_end'" : " AND FROM_UNIXTIME(FLOOR(`time` / 1000)) <= '$sched_start'") ."
+                      ". ($first_sched ? " AND FROM_UNIXTIME(FLOOR(`time` / 1000)) <= '$absent_start'" : " ") ."
+                      " . ($last_timeout ? " AND FROM_UNIXTIME(FLOOR(`time` / 1000)) >= '$last_timeout'" : "") . "
+                      " . ($last_sched_end ? " AND FROM_UNIXTIME(FLOOR(`time` / 1000)) >= '$last_sched_end'" : "") . "
+                      AND FROM_UNIXTIME(FLOOR(`time` / 1000)) != '{$date} 00:00:00' 
+                    $order_by
+                    LIMIT 1
+                ",
+                'timeout' => "
+                    SELECT 
+                        FROM_UNIXTIME(FLOOR(`time` / 1000)) AS logtime,
+                        ABS(TIME_TO_SEC(TIMEDIFF(FROM_UNIXTIME(FLOOR(`time` / 1000)), '$sched_end'))) AS time_diff,
+                        deviceKey
+                    FROM facial_Log
+                    WHERE employeeid = '$emp_id'
+                      AND DATE(FROM_UNIXTIME(FLOOR(`time` / 1000))) = '$date'
+                      " . ($first_sched ? " AND LEAST(FROM_UNIXTIME(FLOOR(`time` / 1000)), '$sched_end') <= '$sched_end'" : " AND FROM_UNIXTIME(FLOOR(`time` / 1000)) >= '$sched_end'") ."
+                      " . ($prior_sched_start ? " AND FROM_UNIXTIME(FLOOR(`time` / 1000)) <= '$prior_sched_start'" : "") . "
+                      AND FROM_UNIXTIME(FLOOR(`time` / 1000)) >= '$early_dismissal'
+                      AND FROM_UNIXTIME(FLOOR(`time` / 1000)) != '{$date} 00:00:00' 
+                    $order_by_timeout
+                    LIMIT 1
+                "
+            ];
+            
+
+            // Execute and fetch time-in log
+            $records = $this->db->query($queries['timein']);
+            // echo $this->db->last_query(); die;
+            if ($records->num_rows() > 0) {
+                $row = $records->row();
+                $timein = $row->logtime;
+            } else {
+                // Fallback query for time pm if no result found
+                if($first_sched === false){
+                  $fallback_query = "
+                      SELECT 
+                          FROM_UNIXTIME(FLOOR(`time` / 1000)) AS logtime,
+                          ABS(TIME_TO_SEC(TIMEDIFF(FROM_UNIXTIME(FLOOR(`time` / 1000)), '$sched_start'))) AS time_diff,
+                          deviceKey
+                      FROM facial_Log
+                      WHERE employeeid = '$emp_id'
+                        AND DATE(FROM_UNIXTIME(FLOOR(`time` / 1000))) = '$date'
+                        AND FROM_UNIXTIME(FLOOR(`time` / 1000)) >= '$sched_start'
+                        " . ($prior_sched_start ? " AND FROM_UNIXTIME(FLOOR(`time` / 1000)) < '$prior_sched_start'" : "") . "
+                      $order_by
+                      LIMIT 1
+                  ";
+
+                  $records = $this->db->query($fallback_query);
+                  if ($records->num_rows() > 0) {
+                      $row = $records->row();
+                      $timein = $row->logtime;
+                      $device_key = $row->deviceKey;
+                  }
+                }
+            }
+
+            // Execute and fetch time-out log
+            $records = $this->db->query($queries['timeout']);
+            
+            // echo $this->db->last_query(); die;
+            if ($records->num_rows() > 0) {
+                $row = $records->row();
+                $timeout = $row->logtime;
+                $device_key = $row->deviceKey;
+            } else {
+                // Fallback query for timeout if no result found
+                $fallback_query = "
+                    SELECT 
+                        FROM_UNIXTIME(FLOOR(`time` / 1000)) AS logtime,
+                        ABS(TIME_TO_SEC(TIMEDIFF(FROM_UNIXTIME(FLOOR(`time` / 1000)), '$sched_end'))) AS time_diff,
+                        deviceKey
+                    FROM facial_Log
+                    WHERE employeeid = '$emp_id'
+                      AND DATE(FROM_UNIXTIME(FLOOR(`time` / 1000))) = '$date'
+                    ". ($first_sched === false ? " AND FROM_UNIXTIME(FLOOR(`time` / 1000)) >= '$sched_end'" : "  AND FROM_UNIXTIME(FLOOR(`time` / 1000)) >= '$sched_end'")."
+                    " . ($prior_sched_start ? " AND FROM_UNIXTIME(FLOOR(`time` / 1000)) > '$prior_sched_start'" : "") . "
+                    ORDER BY time_diff ASC
+                    LIMIT 1
+                ";
+                $records = $this->db->query($fallback_query);
+                
+                if ($records->num_rows() > 0) {
+                    $row = $records->row();
+                    $timeout = $row->logtime;
+                    $device_key = $row->deviceKey;
+                }
+                
+                // CHECK IF HAS UPCOMING LOGS
+                $upcomingSchedule = $emp_schedule[$key + 1] ?? '';
+                if($upcomingSchedule && ($timein == "" || $timeout == "")){
+                  $login = $this->timesheet->currentLogtimeAMSchedule(
+                      $emp_id, 
+                      $date, 
+                      $upcomingSchedule->stime ?? '', 
+                      $upcomingSchedule->absent_start ?? ''
+                  );
+
+                  $logout = $this->timesheet->currentLogtimePMSchedule(
+                      $emp_id, 
+                      $date, 
+                      $upcomingSchedule->etime ?? '', 
+                      $upcomingSchedule->early_dismissal ?? ''
+                  );
+
+                }
+                
+            }
+
+            // remove timein if same value on timeout
+            if($timein === $timeout){
+              $timein = "";
+            }
+
+            if($has_last_timein != "" && $has_last_timeout == ""){
+              if($timein == "" && $timeout != ""){
+                $timein = $has_last_timein;
+              }
+            }
+
+            if($has_last_timein == "" && $has_last_timeout != ""){
+                $timein = $has_last_timeout;
+            }
+
+            // Globals::pd(array($timein, $timeout));
+            // Check for existing timesheet record
+            $is_exist = $this->db->query("
+                SELECT * 
+                FROM timesheet 
+                WHERE userid = '$emp_id' 
+                  AND (timein = '$timein' OR timeout = '$timeout')
+            ")->num_rows();
+
+            // Insert timesheet record if no existing entry
+            if ($is_exist == 0 && $timein && $timeout) {
+              if($this->time->areTimesValid($timein, $timeout)){
+                if($timein != $timeout){
+                    $t_data = [
+                        "timein" => $timein,
+                        "timeout" => $timeout,
+                        "userid" => $emp_id,
+                        "otype" => "Facial",
+                        "type" => "EDIT",
+                        "addedby" => $device_key,
+                    ];
+                    $this->db->insert("timesheet", $t_data);
+                  }
+              }
+            
+              $last_timein = $timein;
+              $last_timeout = $timeout;
+            }
+
+            $has_last_timein = $timein;
+            $has_last_timeout = $timeout;
+            
+            $first_sched = false;
+        }
+      }
+
+  }
+
   public function reprocessFacialLogBySchedule($emp_id, $date) {
     // Get employee schedule
     $emp_sched = $this->attcompute->displaySched($emp_id, $date);
@@ -421,9 +630,9 @@ class Timesheet extends CI_Model {
                     FROM facial_Log
                     WHERE employeeid = '$emp_id'
                       AND DATE(FROM_UNIXTIME(FLOOR(`time` / 1000))) = '$date'
-                      " . ($first_sched ? " AND LEAST(FROM_UNIXTIME(FLOOR(`time` / 1000)), '$sched_end') <= '$sched_end'" : " AND FROM_UNIXTIME(FLOOR(`time` / 1000)) >= '$sched_end'") ."
-                      " . ($prior_sched_start ? " AND FROM_UNIXTIME(FLOOR(`time` / 1000)) < '$prior_sched_start'" : "") . "
-                      AND FROM_UNIXTIME(FLOOR(`time` / 1000)) > '$absent_start'
+                      " . ($first_sched ? " AND LEAST(FROM_UNIXTIME(FLOOR(`time` / 1000)), '$sched_end') < '$sched_end'" : " AND FROM_UNIXTIME(FLOOR(`time` / 1000)) >= '$sched_end'") ."
+                      " . ($prior_sched_start ? " AND FROM_UNIXTIME(FLOOR(`time` / 1000)) <= '$prior_sched_start'" : "") . "
+                      AND FROM_UNIXTIME(FLOOR(`time` / 1000)) >= '$early_dismissal'
                       AND FROM_UNIXTIME(FLOOR(`time` / 1000)) != '{$date} 00:00:00' 
                     $order_by_timeout
                     LIMIT 1
@@ -487,11 +696,32 @@ class Timesheet extends CI_Model {
                     LIMIT 1
                 ";
                 $records = $this->db->query($fallback_query);
+                
                 if ($records->num_rows() > 0) {
                     $row = $records->row();
                     $timeout = $row->logtime;
                     $device_key = $row->deviceKey;
                 }
+                
+                // CHECK IF HAS UPCOMING LOGS
+                $upcomingSchedule = $emp_schedule[$key + 1] ?? '';
+                if($upcomingSchedule && ($timein == "" || $timeout == "")){
+                  $login = $this->timesheet->currentLogtimeAMSchedule(
+                      $emp_id, 
+                      $date, 
+                      $upcomingSchedule->stime ?? '', 
+                      $upcomingSchedule->absent_start ?? ''
+                  );
+
+                  $logout = $this->timesheet->currentLogtimePMSchedule(
+                      $emp_id, 
+                      $date, 
+                      $upcomingSchedule->etime ?? '', 
+                      $upcomingSchedule->early_dismissal ?? ''
+                  );
+
+                }
+                
             }
 
             // remove timein if same value on timeout
@@ -500,9 +730,13 @@ class Timesheet extends CI_Model {
             }
 
             if($has_last_timein != "" && $has_last_timeout == ""){
-              // if($timein == "" && $timeout != ""){
+              if($timein == "" && $timeout != ""){
                 $timein = $has_last_timein;
-              // }
+              }
+            }
+
+            if($has_last_timein == "" && $has_last_timeout != ""){
+                $timein = $has_last_timeout;
             }
 
             // Globals::pd(array($timein, $timeout));
@@ -575,45 +809,49 @@ class Timesheet extends CI_Model {
   }
 
   public function currentLogtimePMSchedule($emp_id, $date, $schedule, $early_dismissal, $used_time=array(), $prior_sched_start="", $prior_absent_start=""){
-    $sched_with_date = $date." ".$schedule;
-    $early_d_with_date = $date." ".$early_dismissal;
-    $q_logs = $this->db->query("SELECT 
+      $sched_with_date = $date." ".$schedule;
+      $early_d_with_date = $date." ".$early_dismissal;
+
+      $where_clause = "";
+      if($prior_sched_start){
+        $prior_sched_start = $date." ".$prior_sched_start;
+        $where_clause = " AND FROM_UNIXTIME(FLOOR(`time` / 1000)) < '$prior_sched_start'";
+      }
+      
+      $q_logs = $this->db->query("SELECT 
+                                FROM_UNIXTIME(FLOOR(`time` / 1000)) AS logtime
+                                FROM
+                                facial_Log 
+                                WHERE employeeid = '$emp_id' 
+                                AND DATE(FROM_UNIXTIME(FLOOR(`time` / 1000))) = '$date' 
+                                AND FROM_UNIXTIME(FLOOR(`time` / 1000)) >= '$sched_with_date'
+                                AND FROM_UNIXTIME(FLOOR(`time` / 1000)) >= '$early_d_with_date'
+                                AND FROM_UNIXTIME(FLOOR(`time` / 1000)) NOT IN (SELECT timein FROM timesheet WHERE userid = '$emp_id' AND DATE(timein) = '$date' AND otype = 'Facial')
+                                $where_clause
+                                ORDER BY ABS(TIME_TO_SEC(TIMEDIFF(FROM_UNIXTIME(FLOOR(`time` / 1000)), '$sched_with_date'))) ASC 
+                                LIMIT 1 ");
+      if($q_logs->num_rows() == 0){
+          
+          $q_logs = $this->db->query("SELECT 
                               FROM_UNIXTIME(FLOOR(`time` / 1000)) AS logtime
                               FROM
                               facial_Log 
                               WHERE employeeid = '$emp_id' 
                               AND DATE(FROM_UNIXTIME(FLOOR(`time` / 1000))) = '$date' 
                               AND FROM_UNIXTIME(FLOOR(`time` / 1000)) <= '$sched_with_date'
-                              AND FROM_UNIXTIME(FLOOR(`time` / 1000)) >= '$early_d_with_date'
+                              AND FROM_UNIXTIME(FLOOR(`time` / 1000)) NOT IN (SELECT timein FROM timesheet WHERE userid = '$emp_id' AND DATE(timein) = '$date' AND otype = 'Facial')
+                              $where_clause
                               ORDER BY ABS(TIME_TO_SEC(TIMEDIFF(FROM_UNIXTIME(FLOOR(`time` / 1000)), '$sched_with_date'))) ASC 
                               LIMIT 1 ");
-    if($q_logs->num_rows() == 0){
-        $where_clause = "";
-        if($prior_sched_start){
-          $prior_sched_start = $date." ".$prior_sched_start;
-          $where_clause = " AND FROM_UNIXTIME(FLOOR(`time` / 1000)) < '$prior_sched_start'";
-        }
-        
-        $q_logs = $this->db->query("SELECT 
-                            FROM_UNIXTIME(FLOOR(`time` / 1000)) AS logtime
-                            FROM
-                            facial_Log 
-                            WHERE employeeid = '$emp_id' 
-                            AND DATE(FROM_UNIXTIME(FLOOR(`time` / 1000))) = '$date' 
-                            AND FROM_UNIXTIME(FLOOR(`time` / 1000)) >= '$sched_with_date'
-                            $where_clause
-                            ORDER BY ABS(TIME_TO_SEC(TIMEDIFF(FROM_UNIXTIME(FLOOR(`time` / 1000)), '$sched_with_date'))) ASC 
-                            LIMIT 1 ");
-        if($q_logs->num_rows() > 0){
+          if($q_logs->num_rows() > 0){
+            return $q_logs->row()->logtime;
+          }
+      }else{
           return $q_logs->row()->logtime;
-        }
-    }else{
-        return $q_logs->row()->logtime;
-    }
+      }
 
-    return false;
-}
-
+      return false;
+  }
   
   public function attendanceReprocessFacialLogBySchedule($emp_id, $date) {
     // Get employee schedule

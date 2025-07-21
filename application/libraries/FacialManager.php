@@ -23,7 +23,6 @@ class FacialManager
 
     // Initialize processing of Daily Time Record (DTR) reports
     public function processFacial($facialJob, $worker_id){
-
         if ($facialJob->worker_id == $worker_id) $this->process_facial($facialJob, $worker_id);
     }
 

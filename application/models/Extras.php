@@ -517,9 +517,10 @@ function showStudentSY() {
         return $return;
     }
 
-    function getAllEmployeeListOption($status=""){
+    function getAllEmployeeListOption($status="", $subcampus = false){
         $this->db->select("CONCAT(lname, ', ', fname, ' ', mname) AS fullname, employeeid", FALSE);
         if($status != "") $this->db->where('isactive', $status);
+        if(!$subcampus) $this->db->where('campusid', $this->db->campus_code);
         $query = $this->db->get('employee');
         return $query->result_array();
     }
@@ -577,7 +578,7 @@ function showStudentSY() {
     }
 
     function getCampuses($campusid = "") {
-        $return = "";
+        $return = '';
         $campusid = $this->db->campus_code;
         $query = $this->db->query("SELECT code, description FROM code_campus WHERE code = '$campusid'")->result();
         foreach ($query as $key) {
@@ -593,6 +594,7 @@ function showStudentSY() {
     }
 
     function getSubCampuses($campusid = "") {
+        $return = ""; //ADD DEFAULT VARIABLE
         $campusid = $this->db->campus_code;
         $query = $this->db->query("SELECT code, description FROM code_campus WHERE code != '$campusid'")->result();
         foreach ($query as $key) {
@@ -658,6 +660,20 @@ function showStudentSY() {
             if($campusid == $key->code) $return .= '<option value='.Globals::_e($key->code).' selected>'.Globals::_e($key->description).'</option>';
             else $return .= '<option value='.Globals::_e($key->code).'>'.Globals::_e($key->description).'</option>';
         }
+        return $return;
+    }
+
+    function getCampusesWithoutCondition($campusid = "",$all=true) {
+        $where = '';
+        $return = "<option value=''>Select Site</option>";
+        if($all) $return = "<option value='all'>All Site</option>";
+
+        $query = $this->db->query("SELECT code, description FROM code_campus $where")->result();
+        foreach ($query as $key) {
+            if($campusid == $key->code) $return .= '<option value='.Globals::_e($key->code).' selected>'.Globals::_e($key->description).'</option>';
+            else $return .= '<option value='.Globals::_e($key->code).'>'.Globals::_e($key->description).'</option>';
+        }
+        
         return $return;
     }
 
@@ -870,6 +886,25 @@ function showStudentSY() {
         return $return;
     }
 
+    function getEmploymentStat($typeid = "", $isall = false, $ismultiple=false) {
+        if($isall) $return = "<option value='all'  ".($typeid == 'all' ? 'selected' : '')."> All Employment Status </option>";
+        else  $return = "<option value=''>  All Employment Status  </option>";
+
+        if($ismultiple && $typeid != 'all') $typeid = explode(',', $typeid);
+        $query = $this->db->query("SELECT code, description FROM code_status")->result();
+        foreach ($query as $key) {
+            if($ismultiple && $typeid != 'all'){
+                if(in_array($key->code, $typeid)) $return .= '<option value= '.$key->code.' selected>'.GLOBALS::_e($key->description).'</option>';
+                else $return .= '<option value= '.$key->code.' >'.GLOBALS::_e($key->description).'</option>';
+            }else{
+                if($typeid == $key->code) $return .= '<option value= '.$key->code.' selected>'.GLOBALS::_e($key->description).'</option>';
+                else $return .= '<option value= '.$key->code.' >'.GLOBALS::_e($key->description).'</option>';
+            }
+        }
+
+        return $return;
+    }
+
     function getDeptpartmentCodeDepartmentbyCode($deptid = "") {
         $return = "<option value=''>  All Department  </option>";
         $query = $this->db->query("SELECT id, code, description FROM code_department")->result();
@@ -1048,6 +1083,16 @@ function showStudentSY() {
         }
     }
 
+    function showprovincelist(){
+        $return = array(""=>"Choose a province ..");
+        $q = $this->db->query("SELECT provDesc,provCode FROM refprovince ORDER BY provDesc")->result();
+        foreach($q as $oo){
+          $return[Globals::_e($oo->provCode)] = Globals::_e($oo->provDesc);    
+        }
+        
+        return $return;
+    }
+
     function provincedesc($prov=""){
         $return = "";
         $query = $this->db->query("SELECT * FROM refprovince where provCode='$prov'");
@@ -1071,6 +1116,16 @@ function showStudentSY() {
         }
     }
 
+    function showmunicipalitylist(){
+        $return = array(""=>"Choose a municipality ...");
+        $q = $this->db->query("SELECT citymunDesc,citymunCode FROM refcitymun ORDER BY citymunDesc")->result();
+        foreach($q as $oo){
+          $return[Globals::_e($oo->citymunCode)] = Globals::_e($oo->citymunDesc);    
+        }
+
+        return $return;
+    }
+
     function barangaylist($data){
         $brgyid=trim($data['brgyid']);
         $munid=$data['munid'];
@@ -1086,6 +1141,16 @@ function showStudentSY() {
               echo "<option value='$val' ". ($brgyid == $val? "selected":"")  .">$disp</option>";
             }
         }
+    }
+
+    function showbarangaylist($condition = ""){
+        $return = array(""=>"Choose a barangay ...");
+        $q = $this->db->query("SELECT brgyDesc,brgyCode FROM refbrgy $condition ORDER BY brgyDesc")->result();
+        foreach($q as $oo){
+          $return[Globals::_e($oo->brgyCode)] = Globals::_e($oo->brgyDesc);    
+        }
+
+        return $return;
     }
     
     function barangaydesc($barangay=""){
@@ -1485,7 +1550,7 @@ function showStudentSY() {
         $returns = array();
         $param = "";
         if($hol)    $param = " AND b.holi_cal_id='$hol'";
-        $q = $this->db->query("SELECT a.code,a.description,b.* FROM code_office a LEFT JOIN holiday_inclusions b ON a.code = b.dept_included $param ORDER BY a.description"); 
+        $q = $this->db->query("SELECT a.code,a.description,b.* FROM code_department a LEFT JOIN holiday_inclusions b ON a.code = b.dept_included $param ORDER BY a.description"); 
         for($t=0;$t<$q->num_rows();$t++){
           $row = $q->row($t);
           $returns[$row->code] = $row->description."|".$row->permanent."|".$row->prob."|".$row->contractual;
@@ -1655,6 +1720,15 @@ function showStudentSY() {
         // return $this->db->escape($deptid);
     }
 
+    function getSessionControl($username){
+        $query = $this->db->query("SELECT current_session FROM user_info WHERE username='$username' AND restrictMultipleDevices = '1' AND current_session != ''");
+        if($query->num_rows() > 0){
+            return $query->row()->current_session;
+        }else{
+            return false;
+        }
+    }
+
     function getemployeeofficeMultiple($office=''){
         $myoffice = "";
         $row = $this->db->query("SELECT code,description FROM code_office WHERE FIND_IN_SET(`code`, '$office') ")->result();
@@ -1820,6 +1894,18 @@ function showStudentSY() {
         }
         return $return;
     }
+
+    public function showBloodDesc($code) {
+        $result = $this->db
+            ->select('description')
+            ->from('code_blood')
+            ->where('bloodid', $code)
+            ->get()
+            ->row();
+
+        return $result ? $result->description : null;
+    }
+
     function show_languages(){
         $return = array(""=>"Choose a Languages ...");
         $q = $this->db->query("SELECT id, language FROM employee_language order by language")->result();
@@ -1904,6 +1990,11 @@ function showStudentSY() {
     }
     /* END */
     
+    function isCoordinator($value){
+        $coordinators = ['clodin.fuerte', 'hazel.cruz', 'maricris.dumaran'];
+        return in_array($value, $coordinators);
+    }
+
     function idxval($dayofweek=''){
         $return = "";
         switch($dayofweek){
@@ -2492,12 +2583,15 @@ function showStudentSY() {
         }else{
             $tardy =  date("H:i:s",strtotime($sched[0]->tardy_start));
             $absent =  date("H:i:s",strtotime($sched[0]->absent_start));
+            $flexible =  $sched[0]->flexible;
             list($login,$logout,$q)            = $this->attcompute->displayLogTime($empid,date("Y-m-d"),$sched[0]->starttime,$sched[0]->endtime,"NEW");
             if ($login != "") {
                $login =  date("H:i:s",strtotime($login));
             }
-
-            if($login == "" && date("H:i s",strtotime("now")) > $tardy) {
+            if($flexible == "YES") {
+                $remarks = "flexible";
+                $time = date("h:i A",strtotime($login));
+            }else if($login == "" && date("H:i s",strtotime("now")) > $tardy) {
                 $remarks = "absent";
                 $time = date("h:i A",strtotime($absent));
             }elseif($login == "") {
@@ -2647,6 +2741,7 @@ function showStudentSY() {
         $count = $countInsert = "";
         $queryInsert ="";
         $datas = explode("|", $data);
+
         $prev_eid = $baseid = $tID = '';
             # code...
             foreach ($datas as $value) {
@@ -2950,7 +3045,7 @@ function showStudentSY() {
         // end of saving to employee_schedule_adjustment_ext
 
         // save to timesheet
-        $this->db->query("INSERT INTO timesheet (userid, timein, timeout, timestamp) VALUES ('{$eid}','{$timein}','{$timeout}','".date("Y-m-d H:i:s")."')");
+        // $this->db->query("INSERT INTO timesheet (userid, timein, timeout, timestamp) VALUES ('{$eid}','{$timein}','{$timeout}','".date("Y-m-d H:i:s")."')");
         // end saving to timesheet
         // var_dump("<pre>",$this->db->last_query());die;
     }
@@ -3329,6 +3424,11 @@ function showStudentSY() {
         return $arr;
     }
 
+    public function getBankInfo($code){
+        $query =  $this->db->query("SELECT * FROM code_bank_account WHERE code = '$code'");
+        return $query->num_rows() > 0 ? $query->row() : "";
+    }
+
     function checkifCodeExist($code, $table, $holiday_type=''){
         $where = '';
         $num = ($holiday_type) ? 1 : 0; 
@@ -3599,18 +3699,19 @@ function showStudentSY() {
         }
     }
 
-    function getEmployeeDataRecountLeavePast($id = "", $teachingtype = "", $status = "",$campus = "",$department = "",$office = ""){
+    function getEmployeeDataRecountLeavePast($id = "", $teachingtype = "", $status = "",$campus = "",$department = "",$office = "",$emp_status = ""){
         $today = date("Y-m-d");
         $wh = "";
         // var_dump($teachingtype);
         if ($id == "" || $id == 'all'){ 
             if ($teachingtype != ""){
-                if($teachingtype != "trelated") $wh .= " AND a.teachingtype = '$teachingtype' ";
+                if($teachingtype != "trelated") $wh .= " AND a.teachingtype = '$teachingtype' AND a.trelated = '0' ";
                 else $wh .= " AND a.teachingtype='teaching' AND a.trelated = '1'";
             }
             if ($campus != "") $wh .= ($campus == "All" ? "" : " AND a.campusid = '$campus'");
             if ($department != "") $wh .= " AND a.deptid = '$department'";
             if ($office != "") $wh .= " AND a.office = '$office'";
+            if ($emp_status != "" && $emp_status != "all") $wh .= " AND a.employmentstat = '$emp_status'";
             if ($status == "active"){
                 $wh .= " AND isactive=1"; 
             }elseif($status == "inactive"){
@@ -3629,8 +3730,11 @@ function showStudentSY() {
         return $this->db->query("SELECT * FROM employee_leave_credit WHERE employeeid = '$employeeid' AND leavetype = '$leaveType'")->result();
     }
 
-    function getLeaveCreditSetup($type){
-        return $this->db->query("SELECT DISTINCT(`code`),emp_type FROM code_request_leave_setup WHERE teaching_type = '$type'")->result();
+    function getLeaveCreditSetup($type, $leaveType = ""){
+        $wc = '';
+        if ($leaveType) $wc .= " AND code = '$leaveType'";
+        if ($leaveType && $leaveType != 'YEL') $wc .= " AND teaching_type = '$type'";
+        return $this->db->query("SELECT DISTINCT(`code`),emp_type FROM code_request_leave_setup WHERE 1 $wc")->result();
     }
 
     function saveLeaveToHistory($data){
@@ -3649,9 +3753,11 @@ function showStudentSY() {
         $value = "";
         $type = "";
         $calWhere = "";
+        $wc = "";
         if ($cal_type != "" AND $yearService >= 11) $calWhere = "AND cal_type = '$cal_type'";
+        if ($code != 'YEL') $wc .= " AND teaching_type = '$teachingtype' AND emp_type = '$employmentstat'";
         $leaveType = $teachingtype."Type";
-        $data = $this->db->query("SELECT credits, cal_type FROM code_request_leave_setup WHERE $yearService BETWEEN `from` AND `to` AND `code` = '$code' AND emp_type = '$employmentstat' AND teaching_type = '$teachingtype' $calWhere")->result_array();
+        $data = $this->db->query("SELECT credits, cal_type FROM code_request_leave_setup WHERE $yearService BETWEEN `from` AND `to` AND `code` = '$code' $wc $calWhere")->result_array();
         if (empty($data)) {
         //     $leaveGreater = $this->db->query("SELECT credits, cal_type FROM code_request_leave_setup WHERE `code` = '$code' AND emp_type = '$employmentstat' AND teaching_type = '$teachingtype' order by `to` DESC limit 1")->result_array();
         //     if (empty($leaveGreater)) {
@@ -4092,12 +4198,36 @@ function showStudentSY() {
     public function hasSuspension($dfrom, $dto){
         $query  = $this->db->query("SELECT 1 FROM code_holiday_calendar WHERE (DATE(date_from) BETWEEN '$dfrom' AND '$dto') OR (DATE(date_to) BETWEEN '$dfrom' AND '$dto') AND holiday_id = '5'");
         if($query->num_rows() > 0){
-            return $query->row();
+            return $query->num_rows();
         }else{
             return '0';
         }
     }
 
+    public function isHolidaySuspension($code){
+        $query = $this->db->query("SELECT * FROM `code_holiday_type` WHERE holiday_type = '$code' AND is_suspension = 1;");
+
+        return $query->num_rows() > 0 ? $query->result() : null;
+    }
+
+    public function campusCollection(){
+        $collection = array();
+        $query = $this->db->query("SELECT code, description FROM code_campus")->result();
+        foreach ($query as $key) {
+            $collection[$key->code] = $key->description;
+        }
+        return $collection;
+    }
+
+    public function loadManageInOutRemarks($selected = "") {
+        $return = '';
+        $query = $this->db->query("SELECT remarksid, description FROM code_remarks")->result();
+            foreach ($query as $key) {
+                $is_selected = ($key->remarksid == $selected) ? "selected" : "";
+                $return .= "<option value='".Globals::_e($key->remarksid)."' ".$is_selected." >".$key->description."</option>";
+            }
+        return $return;
+    }
 }
  
 /* End of file extras.php */

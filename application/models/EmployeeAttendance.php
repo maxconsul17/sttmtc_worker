@@ -727,6 +727,18 @@ class EmployeeAttendance extends CI_Model {
                 $off_admin = $subtotaltpdadmin ? $subtotaltpdadmin : "";
                 $off_overload = $subtotaltpdrle ? $subtotaltpdrle : "";
 
+                if($rsched->classification == 'PROCTORING'){
+                    $absent = false;
+                    $login = $off_time_in;
+                    $logout = $off_time_out;
+
+                    // remove the absent total
+                    $tschedlec = "";
+                    $tschedlab = "";
+                    $tschedadmin = "";
+                    $tschedrle = "";
+                }
+
                 $actlog_time_in = ($login && !$absent ? date("h:i A",strtotime($login)) : "--");
                 $actlog_time_out = ($logout && !$absent ? date("h:i A",strtotime($logout)) : "--");
 
@@ -1051,6 +1063,10 @@ class EmployeeAttendance extends CI_Model {
                             ${"twr_$key"} = $this->calculateTimeDifference($data['off'], $data['lateut']);
                         }
                     }
+                }
+
+                if($rsched->classification == 'PROCTORING'){
+                    $remarks = $rsched->classification;
                 }
              
                 $this->db->query("INSERT INTO employee_attendance_teaching
@@ -1437,8 +1453,10 @@ class EmployeeAttendance extends CI_Model {
         $countrow = $sched->num_rows();
 
         $isValidSchedule = true;
+        $isFlexible = false;
 
         if($countrow > 0){
+            $isFlexible = $sched->row(0)->flexible == 'YES' ? true : false;
             if($sched->row(0)->starttime == '00:00:00' && $sched->row(0)->endtime == '00:00:00') $isValidSchedule = false;
         }
         
@@ -1454,7 +1472,8 @@ class EmployeeAttendance extends CI_Model {
         $tworkhours = $this->attendance->totalWorkhoursPerday($employeeid, $date);
         if($isRegularHoliday) $tworkhours = "0:00";
 
-        if($countrow > 0 && $isValidSchedule){
+        $hasFlexSchedulePerCutoff = $this->isFlexSchedulePerCutoff($employeeid);
+        if($countrow > 0 && $isValidSchedule && (!$isFlexible || ($hasFlexSchedulePerCutoff && $isFlexible))){ 
             $haswholedayleave = false;
             $hasleavecount = 0;
 
@@ -1489,6 +1508,7 @@ class EmployeeAttendance extends CI_Model {
                 $workdays = 0;
                 $ob_type = true;
                 if(1){
+                    
                     if($tempsched == $dispLogDate){  $dispLogDate = "";}
                     $stime  = $rsched->starttime;
                     $etime  = $rsched->endtime; 
@@ -1655,7 +1675,7 @@ class EmployeeAttendance extends CI_Model {
 
                     
                      // Absent
-                    $absent = $this->attcompute->displayAbsent($stime,$etime,$login,$logout,$employeeid,$date,$earlyd);
+                    $absent = $this->attcompute->displayAbsent($stime,$etime,$login,$logout,$employeeid,$date,$earlyd,$absent_start);
 
                     if($oltype == "ABSENT") $absent = $absent;
                     else if($holiday && $isCreditedHoliday) $absent = "";
@@ -1720,7 +1740,6 @@ class EmployeeAttendance extends CI_Model {
                     // GET CURRENT LOG TIME BY SCHEDULE (LOGIN)
                     if (!$login) {
                         $login = $this->timesheet->currentLogtimeAMSchedule($employeeid, $date, $stime, $absent_start, $used_time_no_used);
-
                         // NEW: Remove logout if it’s within a short interval (e.g., 5 minute) of login
                         $min_diff = 5; // minutes
                         if ($login && $last_login) {
@@ -1889,11 +1908,31 @@ class EmployeeAttendance extends CI_Model {
                     }
                     
                     // For bypassing remarks, displaying missing logs
+                    // Use array unpacking or pad with `null` if less than expected fields.
+                    $logEntryFieldsCount = 6;
+
+                    list($upcomingLogin, $upcomingLogout, $upcomingQueue, $hasLogForRemarks, $unusedTime, $observationId) = 
+                        count($upcomingLogEntry) >= $logEntryFieldsCount
+                            ? $upcomingLogEntry
+                            : array_pad($upcomingLogEntry, $logEntryFieldsCount, null);
+
                     if ($login xor $logout) {
                         if (!$login) {
                             $log_remarks = '<span style="color:red">NO TIME IN</span>';
+                            if($isFirstSched === false){
+                                $utlec = $absent;
+                                $absent = "";
+                            }
+                            if($upcomingLogin){
+                                $lateutlec = $absent;
+                                $absent = "";
+                            }
                         } elseif (!$logout) {
                             $log_remarks = '<span style="color:red">NO TIME OUT</span>';
+                            if($upcomingLogin){
+                                $lateutlec = $absent;
+                                $absent = "";
+                            }
                         }
                     }
                     
@@ -1934,8 +1973,8 @@ class EmployeeAttendance extends CI_Model {
 
                     $late = $lateutlec;
                     $undertime = $utlec;
-
-                    if(!empty($holidayInfo) && $holiday){
+                    
+                    if(!empty($holidayInfo) && $holiday && $otherHoliday){
                         $actlog_time_in = $off_time_in;
                         $actlog_time_out = $off_time_out;
                         $log_remarks = str_replace('<span style="color:red">NO TIME IN AND OUT</span>', '', $log_remarks);
@@ -1987,7 +2026,7 @@ class EmployeeAttendance extends CI_Model {
                     if ($ot_app) {
                         if ($ot_app->status == "APPROVED") {
                             // $ot_regular = $ot_app->grand_total;
-                        } else {
+                        } else if($ot_app->status == "PENDING") {
                             if($hasOThours)
                             {
                                 $pending_ot_remarks = "PENDING OVERTIME APPLICATION";
@@ -2043,7 +2082,7 @@ class EmployeeAttendance extends CI_Model {
                     $remarks .= $dispLogDate ? (isset($holidayInfo['description']) ? $holidayInfo['description'] : '') : '';
                     
                     $holiday_data = (!empty($holidayInfo['holiday_type']) && !empty($holiday)) ? $holidayInfo['holiday_type'] : '';
-                    $holiday_type = (!empty($holidayInfo['type']) && !empty($holiday)) ? $holidayInfo['type'] : '';
+                    $holiday_type = (!empty($holidayInfo['type'])) ? $holidayInfo['type'] : '';
                     
 
                    
@@ -2082,20 +2121,18 @@ class EmployeeAttendance extends CI_Model {
                 
                     if ((!$actlog_time_in || $actlog_time_in === '--') && (!$actlog_time_out || $actlog_time_out === '--')) {
                         // Retrieve upcoming log entry data with parameters for upcoming data.
-                        $logEntryFieldsCount = 6;
-                    
-                        // Use array unpacking or pad with `null` if less than expected fields.
-                        list($upcomingLogin, $upcomingLogout, $upcomingQueue, $hasLogForRemarks, $unusedTime, $observationId) = 
-                            count($upcomingLogEntry) >= $logEntryFieldsCount
-                                ? $upcomingLogEntry
-                                : array_pad($upcomingLogEntry, $logEntryFieldsCount, null);
                     
                         // Handle case where an upcoming login exists.
                         if ($upcomingLogin) {
-                            $undertime = $absent_data;
-                            $absent_data = '';
+                            if($last_login && $last_logout){
+                                $undertime = $absent_data;
+                                $absent_data = '';
+                            }else{
+                                $late = $absent_data;
+                                $absent_data = '';
+                            }
                         }else if($last_login && $last_logout){
-                            $late = $absent_data;
+                            $undertime = $absent_data;
                             $absent_data = '';
                         }
                     }
@@ -2164,6 +2201,13 @@ class EmployeeAttendance extends CI_Model {
                      $totalOTWith25 = $this->attcompute->calculateOTWith25($totalLateFormatted,$ot_regular,$ot_restday,$ot_holiday);
                      $totalOTWithout25 = "";
                     //  $totalOTWithout25 = $this->attcompute->calculateOTWithout25($totalLateFormatted,$ot_regular,$ot_restday,$ot_holiday);
+
+                    $flex_cutoff = "";
+                    if($hasFlexSchedulePerCutoff){
+                        $off_time_total  = $this->getFlexibleBreakHours($employeeid,$off_time_total);
+                        $twr = $this->getFlexibleBreakHours($employeeid,$twr);
+                        $flex_cutoff = "Flexible Schedule";
+                    }
                    
                     $this->db->query("INSERT INTO employee_attendance_nonteaching
                     SET employeeid = '$employeeid',
@@ -2185,7 +2229,7 @@ class EmployeeAttendance extends CI_Model {
                         absent = '$absent_data',
                         service_credit = '$service_credit',
                         cto = '$cto_credit',
-                        remarks = ".$this->db->escape($remarks).",
+                        remarks = ".$this->db->escape($flex_cutoff . PHP_EOL . $remarks).",
                         vl = '$vacation',
                         sl = '$sick',
                         other = '$other',
@@ -2201,7 +2245,7 @@ class EmployeeAttendance extends CI_Model {
                         total_ot_with_25 = '$totalOTWith25',
                         total_ot_without_25 = '$totalOTWithout25'
                         ");
-
+                    
                     //Update all same total with and without 25% 
                     $this->attendance->updateTotalOT($totalOTWith25,$employeeid,$date,'total_ot_with_25');
                     $this->attendance->updateTotalOT($totalOTWithout25,$employeeid,$date,'total_ot_without_25');
@@ -2224,7 +2268,14 @@ class EmployeeAttendance extends CI_Model {
                 $last_stime = $off_time_in;
                 $last_etime = $off_time_out;
             } // foreach($sched->result() as $rsched)
-        }else{ // if($countrow > 0 && $isValidSchedule)
+        }else if($isFlexible && $countrow > 0){ // flexible with schedule
+            $this->load->model("FlexibleSchedule", "flexible_schedule");
+            $this->flexible_schedule->processAttendance($employeeid, $date, $sched);
+        }else{ // if($countrow > 0 && $isValidSchedule) flexible without schedule
+            $is_flexible = $sched->num_rows() > 0 ? $sched->row()->flexible == 'YES' : false;
+            $breaktime = $sched->num_rows() > 0 ? $sched->row()->breaktime : 0;
+            $required_hours = $sched->num_rows() > 0 ? $sched->row()->hours : 0;
+            
             $totalQ = 0;
             $stime = "";
             $etime = ""; 
@@ -2300,7 +2351,7 @@ class EmployeeAttendance extends CI_Model {
                 $login = $logout = $q = "";
                 $stime = $etime = "--";
 
-                for($i = 0;$i < count($log);$i++){
+                for($i = 0;$i < count($log);$i++){                    
                     $login = $log[$i][0];
                     $logout = $log[$i][1];
                     $q = $log[$i][2];
@@ -2333,6 +2384,21 @@ class EmployeeAttendance extends CI_Model {
                     $holiday_data = (isset($holidayInfo['type']) ? $holidayInfo['type'] : '');
                     $holiday_type = (isset($holidayInfo['holiday_type']) && $holiday) ?$holidayInfo['holiday_code'] : "";
 
+                    //Para makuha yung late naunang ma add sa db at maisama sa total overtime
+                    $logs_late = $this->attendance->loadLates($employeeid, $date, "employee_attendance_nonteaching");
+                    $logsLateMinute = $this->attcompute->convertToMinutes($logs_late);
+                    $late = "00:00";
+                    $lateMinute = $this->attcompute->convertToMinutes($late);
+
+                    $totalLate = abs($logsLateMinute + $lateMinute);
+
+                    $totalLateFormatted = $this->attcompute->convertToTimeFormat($totalLate);
+
+                    //Total overtime with && without 25% 
+                     $totalOTWith25 = $this->attcompute->calculateOTWith25($totalLateFormatted,$ot_regular,$ot_restday,$ot_holiday);
+
+                     $late = "";
+
                     $this->db->query("INSERT INTO employee_attendance_nonteaching
                     SET employeeid = '$employeeid',
                         `date` = '$date',
@@ -2357,16 +2423,20 @@ class EmployeeAttendance extends CI_Model {
                         vl = '$vacation',
                         sl = '$sick',
                         other = '$other',
-                        holiday = '$holiday_data'
+                        holiday = '$holiday_data',
+                        total_ot_with_25 = '$totalOTWith25'
                         ");
                 } // for($i = 0;$i < count($log);$i++){
             }else{ // if(count($log) > 0)
+                $this->load->model("FlexibleSchedule", "flexible_schedule");
                 $sc_application = $this->attcompute->displaySCAttendance($employeeid,$date, $stime, $etime);
                 if($sc_application > 0){
                     if($sc_app_remarks != "Approved Conversion Service Credit"){
                         $sc_app_remarks.=($sc_app_remarks?", Approved Conversion Service Credit":"Approved Conversion Service Credit");
                     }
                 }
+
+                $pending_ot_remarks =  ""; 
 
                 $log = $this->attcompute->displayLogTimeFlexi($employeeid,$date,$edata);
                 $off_time_in = $off_time_out = $off_time_total = $actlog_time_in = $actlog_time_out = $terminal = $twr = $ot_regular = $ot_restday = $ot_holiday = $late = $undertime = $vl_deduc_late = $vl_deduc_undertime = $absent_data = $service_credit = $cto_credit = $remarks = $vacation = $sick = $other = $holiday_data = "--";
@@ -2381,6 +2451,19 @@ class EmployeeAttendance extends CI_Model {
                     $actlog_time_out = date("h:i A", strtotime($logout));
                 }
 
+                $ot_app =  $this->attcompute->displayOTApp($employeeid, $date);
+                    $hasOThours=  $this->attcompute->hasOvertimeHours($employeeid, $date);
+                    if ($ot_app) {
+                        if ($ot_app->status == "APPROVED") {
+                            // $ot_regular = $ot_app->grand_total;
+                        } else if($ot_app->status == "PENDING") {
+                            if($hasOThours)
+                            {
+                                $pending_ot_remarks = "PENDING OVERTIME APPLICATION";
+                            }
+                        }
+                    }
+
                 $off_time_total = $this->attcompute->sec_to_hm($perday_absent);
                 $terminal = $this->extensions->getTerminalName($campus_tap);
                 $twr = $tworkhours;
@@ -2391,6 +2474,7 @@ class EmployeeAttendance extends CI_Model {
                 $remarks = "";
                 $remarks .= $ot_remarks;
                 $remarks .= $sc_app_remarks ;
+                $remarks .=  ($pending_ot_remarks?$pending_ot_remarks."<br>":"");
                 $remarks .= ($pending) ? "PENDING ".$pending."<br>" : "";
                 $remarks .= ($ol ? ($oltype ? ($oltype == "ABSENT" ? "ABSENT W/ FILE" : $oltype) : $this->employeemod->othLeaveDesc($ol)) : "");
                 $remarks .= $service_credit && $service_credit != '--'?'SERVICE CREDIT<br>':'';
@@ -2398,6 +2482,43 @@ class EmployeeAttendance extends CI_Model {
                 $remarks .= (isset($holidayInfo["description"]) ? $holidayInfo["description"] : "");
                 $holiday_data = (isset($holidayInfo['type']) ? $holidayInfo['type'] : '');
                 $holiday_type = (isset($holidayInfo['holiday_type']) && $holiday) ?$holidayInfo['holiday_code'] : "";
+
+                if($is_flexible){
+                    $require_hours_value = $required_hours;// convert to seconds
+                    $required_hours = ($require_hours_value + $breaktime) * 60 * 60; ;
+                    $required_hours = $this->attcompute->sec_to_hm($required_hours);
+                    $twr = $this->flexible_schedule->getRenderedHours($login, $logout, $required_hours);
+                    $undertime = $this->flexible_schedule->getUndertime($employeeid, $date, $require_hours_value);
+                    $remarks = "Flexible Schedule";
+
+                    if($undertime !== "00:00") $remarks .= "<br> Undertime";
+                    if($undertime == "00:00") $undertime = "--";
+
+                    $official_time_total_value = ($require_hours_value) * 60 * 60; // convert to seconds
+                    $off_time_total = $this->attcompute->sec_to_hm($official_time_total_value);
+
+                    if($off_time_total == "00:00") $off_time_total = "--";
+                }
+
+                list($ot_regular,$ot_restday,$ot_holiday) = $this->attcompute->displayOt($employeeid,$date,false,'');
+
+                //Para makuha yung late naunang ma add sa db at maisama sa total overtime
+                $logs_late = $this->attendance->loadLates($employeeid, $date, "employee_attendance_nonteaching");
+                $logsLateMinute = $this->attcompute->convertToMinutes($logs_late);
+                $late = "00:00";
+                $lateMinute = $this->attcompute->convertToMinutes($late);
+
+                $totalLate = abs($logsLateMinute + $lateMinute);
+
+                $totalLateFormatted = $this->attcompute->convertToTimeFormat($totalLate);
+
+                //Total overtime with && without 25% 
+                $totalOTWith25 = $this->attcompute->calculateOTWith25($totalLateFormatted,$ot_regular,$ot_restday,$ot_holiday);
+                $ot_regular = $ot_regular == 0 ?'':$ot_regular;
+                $ot_restday = $ot_restday == 0 ?'':$ot_restday;
+                $ot_holiday = $ot_holiday == 0 ?'':$ot_holiday;
+
+                $late = "";
                 
                 $this->db->query("INSERT INTO employee_attendance_nonteaching
                 SET employeeid = '$employeeid',
@@ -2423,12 +2544,215 @@ class EmployeeAttendance extends CI_Model {
                     vl = '$vacation',
                     sl = '$sick',
                     other = '$other',
-                    holiday = '$holiday_data'
+                    holiday = '$holiday_data',
+                    is_flexible = '$is_flexible',
+                    total_ot_with_25 = '$totalOTWith25'
                     ");
             } 
             $ot_remarks = $sc_app_remarks = $wfh_app_remarks = "";
         } 
+
+
+
     }
+
+    /**
+     * Retrieves the shift assignment (empshift) of a specific employee.
+     *
+     * @param string $employeeid The unique identifier of the employee.
+     * @return string The employee's shift code, or an empty string if not found.
+     * @author Leandrei Santos
+     * 2025
+     */
+    public function fetchEmployeeShift($employeeid) {
+        // Use query binding to prevent SQL injection
+        $query = "SELECT b.hours as b_hours FROM employee a INNER JOIN code_schedule b ON b.`schedid` = a.`empshift` WHERE a.employeeid = ?";
+        $result = $this->db->query($query, array($employeeid));
+
+        if ($result->num_rows() > 0) {
+            $row = $result->row();
+            return $row->b_hours;
+        }
+
+        return '';
+    }
+
+    /**
+     * Fetches the total number of present days for a specific employee
+     * within a given cutoff period from the non-teaching attendance records.
+     *
+     * @param string $employeeid The unique identifier of the employee.
+     * @param string $datefrom   The start date of the cutoff period (YYYY-MM-DD).
+     * @param string $dateto     The end date of the cutoff period (YYYY-MM-DD).
+     * @return int The number of present days within the cutoff period.
+     * @author Leandrei Santos
+     * 2025
+     */
+    public function fetchAttendanceCountPerCutoff($employeeid, $datefrom, $dateto) {
+        $query = "
+                SELECT COUNT(DISTINCT date) AS present
+                FROM employee_attendance_nonteaching
+                WHERE employeeid = ?
+                AND absent = ''
+                AND date BETWEEN ? AND ?
+        ";
+
+        $result = $this->db->query($query, array($employeeid, $datefrom, $dateto));
+
+        if ($result->num_rows() > 0) {
+            return (int) $result->row()->present;
+        }
+
+        return 0;
+    }
+
+    /**
+     * Determines whether an employee was present on a specific date.
+     *
+     * An employee is considered present if there are no attendance records
+     * for the given date where the `absent` field is not empty.
+     *
+     * @param string $employeeId The unique identifier of the employee.
+     * @param string $date The date to check, formatted as YYYY-MM-DD.
+     * @return bool True if the employee was present; false if marked absent.
+     * @author Leandrei Santos
+     * @since 2025
+     */
+    public function isEmployeePresentOnDate(string $employeeId, string $date): bool {
+        $query = "
+            SELECT 1
+            FROM employee_attendance_nonteaching
+            WHERE employeeid = ?
+            AND date = ?
+            AND absent != '' AND absent != '--'
+            LIMIT 1
+        ";
+
+        $result = $this->db->query($query, [$employeeId, $date]);
+
+        return $result->num_rows() === 0;
+    }
+
+
+    /**
+     * Updates the absence status of an employee for a specific date.
+     *
+     * If $status is true, the 'absent' field will be cleared ('').
+     * If $status is false, the 'absent' field will be marked as 'ABSENT'.
+     *
+     * @param string $employeeId The employee's unique identifier.
+     * @param string $date The date to update.
+     * @param bool $status True to clear absence, false to mark as absent.
+     * @return bool True if update was successful, false otherwise.
+     */
+    public function updateAbsenceStatus(string $employeeId, string $date, bool $status): bool {
+        if(!$status){
+            $absenceValue = '';
+
+            $query = "
+                UPDATE employee_attendance_nonteaching
+                SET absent = ?
+                WHERE employeeid = ?
+                AND date = ?
+            ";
+
+            return $this->db->query($query, [$absenceValue, $employeeId, $date]);
+        }
+    }
+
+    /**
+     * Determines if an employee is assigned to a flexible schedule.
+     *
+     * @param string $employeeId The unique identifier of the employee.
+     * @return bool Returns true if the employee has a flexible schedule, false otherwise.
+     * @author Leandrei Santos
+     * @date 2025
+     */
+    public function hasFlexibleSchedule($employeeId) {
+        $sql = "
+            SELECT b.flexible 
+            FROM employee a 
+            INNER JOIN code_schedule b ON b.schedid = a.empshift 
+            WHERE a.employeeid = ?
+        ";
+
+        $query = $this->db->query($sql, array($employeeId));
+
+        if ($query->num_rows() > 0) {
+            $result = $query->row(); // Fetch a single row as object
+            return strtoupper($result->flexible) === 'YES';
+        }
+
+        return false;
+    }
+
+
+    public function isFlexSchedulePerCutoff($employeeId){
+        $sql = "
+            SELECT b.mode 
+            FROM employee a 
+            INNER JOIN code_schedule b ON b.schedid = a.empshift 
+            WHERE a.employeeid = ?
+        ";
+
+        $query = $this->db->query($sql, array($employeeId));
+
+        if ($query->num_rows() > 0) {
+            $result = $query->row(); // Fetch a single row as object
+            return strcasecmp($result->mode, 'cutoff') == 0;
+        }
+
+        return false;
+    }
+
+    /**
+     * Adjusts the official time by subtracting the employee's flexible break hours.
+     *
+     * @param int $employeeId
+     * @param string $officialTime Format: 'H:i'
+     * @return string Adjusted time in 'H:i' format
+     */
+    public function getFlexibleBreakHours($employeeId, $officialTime)
+    {
+        $sql = "
+            SELECT b.breaktime 
+            FROM employee a 
+            INNER JOIN code_schedule b ON b.schedid = a.empshift 
+            WHERE a.employeeid = ?
+        ";
+
+        $query = $this->db->query($sql, array($employeeId));
+
+        if ($query->num_rows() > 0) {
+            $result = $query->row();
+            $breaktimeHours = $result->breaktime;
+
+            // Convert breaktime hours to minutes
+            $breaktimeMinutes = $breaktimeHours * 60;
+
+            // Convert official time to total minutes
+            list($hours, $minutes) = explode(':', $officialTime);
+            $totalMinutes = ($hours * 60) + $minutes;
+
+            // Subtract breaktime minutes
+            $adjustedMinutes = $totalMinutes - $breaktimeMinutes;
+
+            // Ensure adjusted minutes is not negative
+            $adjustedMinutes = max(0, $adjustedMinutes);
+
+            // Convert back to HH:MM format
+            $newHours = floor($adjustedMinutes / 60);
+            $newMinutes = $adjustedMinutes % 60;
+
+            return sprintf('%02d:%02d', $newHours, $newMinutes);
+        }
+
+        // Return original time if no breaktime found
+        return $officialTime;
+    }
+
+
+
 
     public function removeExistingAttendance($employeeid, $date, $teaching = true){
         if($teaching === true){
@@ -2507,24 +2831,26 @@ class EmployeeAttendance extends CI_Model {
     }
 
     function updateDTR($employeeid, $date_from, $date_to, $for_report=true){
-        if($for_report === true){
+        if(getenv("ENVIRONMENT") != "Production"){
             $date_range = $this->attcompute->displayDateRange($date_from, $date_to);
-            foreach ($date_range as $date) {
-                $query = $this->db->query("SELECT id FROM employee_attendance_update WHERE employeeid = '$employeeid' AND `date` = '$date->dte'")->num_rows();
-                if($query > 0){
-                    $this->db->query("UPDATE employee_attendance_update SET hasUpdate = '1' WHERE employeeid = '$employeeid' AND `date` = '$date->dte'");
-                }else{
-                    $this->db->query("INSERT INTO employee_attendance_update SET hasUpdate = '1', employeeid = '$employeeid', `date` = '$date->dte'");
-                }
-            }
+            $this->tagEmployeeToCalculate($employeeid, $date_range);
         }else{
             if($date_from != "0000-00-00" && $date_to != "0000-00-00" && $employeeid)
             {
                 // Prepare data to insert if not existing
+                $final_date_to = $date_to;
+                $next_date = date('Y-m-d', strtotime($date_to . ' +1 day'));
+
+                // Check consecutive holidays
+                while ($this->dateHoliday($next_date)) {
+                    $final_date_to = $next_date;
+                    $next_date = date('Y-m-d', strtotime($next_date . ' +1 day'));
+                }
+
                 $to_calculate = array(
                     "employeeid" => $employeeid,
                     "dfrom" => $date_from,
-                    "dto" => $date_to,
+                    "dto" => $final_date_to,
                     "endpoint" => base_url()
                 );
             
@@ -2532,10 +2858,15 @@ class EmployeeAttendance extends CI_Model {
                 $is_exist = $this->db->select("employeeid")->where($to_calculate)->get("employee_to_calculate")->num_rows();
             
                 // If it doesn't exist, insert the new record
-                if ($is_exist === 0) {
-                    $this->db->insert("employee_to_calculate", $to_calculate);
-                }
+                // if ($is_exist === 0) {
+                //     $this->db->insert("employee_to_calculate", $to_calculate);
+                // }
+                $this->db->insert("employee_to_calculate", $to_calculate);
             }
+
+            $date_range = $this->attcompute->displayDateRange($date_from, $date_to);
+            $this->tagEmployeeToCalculate($employeeid, $date_range);
+
         }
     }
 
@@ -2929,9 +3260,13 @@ class EmployeeAttendance extends CI_Model {
             ORDER BY fullname ASC")->num_rows();
     }
 
+    public function employeeToUpdate($employee_id, $date){
+        return $this->db->query("SELECT id FROM employee_attendance_update WHERE employeeid = '$employee_id' AND date = '$date' AND hasUpdate = '1'")->num_rows(); 
+    }
+
     /**
      * Check if the employee has any log entry on the last scheduled day before the given date,
-     * looking back up to 5 days.
+     * looking back up to 5 days. Skip holidays.
      *
      * @param string $employee_id The ID of the employee.
      * @param string $date        The date in 'Y-m-d' format.
@@ -2946,10 +3281,26 @@ class EmployeeAttendance extends CI_Model {
         $previous_date = date('Y-m-d', strtotime($date . ' -1 day'));
 
         while ($days_checked < $look_back_limit) {
+            $deptid = $this->employee->getindividualdept($employee_id);
+            $teachingtype = $this->extensions->getEmployeeTeachingType($employee_id);
+            $holiday = $this->attcompute->isHolidayDetailed($employee_id, $previous_date, $deptid, "", "", $teachingtype);
+
+            // If it's a holiday, skip this day
+            if ($holiday) {
+                $holidayInfo = $this->attcompute->holidayInfo($previous_date);
+                if($holidayInfo["type"] == "OTHERS"){
+                    return true;  /* ITONG CONDITION IS PARA PAG TUMINGIN SA PAST DAY TAS MAY OTHER HOLIDAY, CONSIDERED AS MAY LOG NA */
+                }
+
+                $previous_date = date('Y-m-d', strtotime($previous_date . ' -1 day'));
+                $days_checked++;
+                continue;
+            }
+
             $sched = $this->attcompute->displaySched($employee_id, $previous_date);
 
             if ($sched && $sched->num_rows() > 0) {
-                // Found a scheduled day, check for logs
+                // Found a scheduled day (not a holiday), check for logs
                 return $this->db->query("
                     SELECT id 
                     FROM facial_Log 
@@ -2967,6 +3318,32 @@ class EmployeeAttendance extends CI_Model {
         return 0;
     }
 
+    public function dateHoliday($date){
+        return $this->db->query("SELECT id FROM code_holiday_calendar WHERE '$date' BETWEEN date_from AND date_to")->num_rows();
+    }
+
+    public function tagEmployeeToCalculate($employeeid, $date_range){
+        foreach ($date_range as $date) {
+            $current_date = $date->dte;
+
+            // Save this date
+            do {
+                $query = $this->db->query("SELECT id FROM employee_attendance_update WHERE employeeid = '$employeeid' AND `date` = '$current_date'")->num_rows();
+                if ($query > 0) {
+                    $this->db->query("UPDATE employee_attendance_update SET hasUpdate = '1' WHERE employeeid = '$employeeid' AND `date` = '$current_date'");
+                } else {
+                    $this->db->query("INSERT INTO employee_attendance_update SET hasUpdate = '1', employeeid = '$employeeid', `date` = '$current_date'");
+                }
+
+                // Check next day
+                $next_date = date('Y-m-d', strtotime($current_date . ' +1 day'));
+                $is_holiday = $this->dateHoliday($next_date);
+
+                // If next date is a holiday, continue the loop
+                $current_date = $next_date;
+            } while ($is_holiday);
+        }
+    }
     
 }
 /* End of file employee.php */
