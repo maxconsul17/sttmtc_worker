@@ -74,7 +74,6 @@ class Payrollprocess extends CI_Model {
 				$this->db->query("DELETE FROM payroll_computed_table WHERE cutoffstart='$sdate' AND cutoffend='$edate' AND schedule='$schedule' AND quarter='$quarter' AND employeeid='$eid' AND status='PENDING'");
 			}
 		}
-		// die;
 
 		foreach ($emplist as $row) {
 			$perdept_amt_arr = array();
@@ -302,16 +301,18 @@ class Payrollprocess extends CI_Model {
 		$this->load->model('income');
 		$perdept_amt_arr = array();
 		$workdays =	$absentdays = 0;
-		$workhours_lec = $workhours_lab = $workhours_admin = "";
+		$workhours = $workhours_lec = $workhours_lab = $workhours_admin = "";
+		$has_flexible = false;
 
 		$eid 		= $row->employeeid;
 		$tnt 		= $row->teachingtype;
 		$employmentstat = $row->employmentstat;
 		$regpay 	=  $row->regpay;
+		$monthly 	=  $row->monthly;
 		$daily 		=  $row->daily;
 		list($regpay, $daily) = $this->getEmployeeSalaryRate($regpay, $daily, $eid, $sdate);
-		$hourly =  $row->hourly;
-		// $hourly 	= ($row->daily / 8);
+		// $hourly =  $row->hourly;  chinage ito dahil nagkakaconflict yung point sa computation ng overtime
+		$hourly 	= round($row->daily / 8, 2);
 		$lechour 	=  $row->lechour;
 		$labhour 	=  $row->labhour;
 		$rlehour 	=  $row->rlehour;
@@ -319,6 +320,7 @@ class Payrollprocess extends CI_Model {
 		$dependents = $row->dependents;
 		$status = $row->status;
 		$office = $row->office;
+		
 		$deptid = '';
 		$campus = '';
 		$is_trelated = '';
@@ -344,38 +346,58 @@ class Payrollprocess extends CI_Model {
 			$this->income->saveHolidayPay($project_hol_pay, $eid, $sdate, $edate, $quarter);
 			$this->income->saveSuspensionPay($suspension_pay, $eid, $sdate, $edate, $quarter);
 			$info[$eid]['substitute'] = $this->comp->computeSubstitute($eid,$conf_base_id);
+			$absent_temp = $absent_amount;
 
 			// GAWING 0 YUNG AMOUNT NG TARDY AT ABSENT PARA DI NA BUMAWAS PA KAPAG TEACHING DAHIL NABAWAS NA YUN SA TAAS, APPLICABLE MUNA ITO SA TEACHING LANG.
 			$is_trelated = $this->employee->isTeachingRelated($eid);
-			if(!$is_trelated){
-				$tardy_amount = 0;
+
+			if($is_trelated){
+				
+				if(!$fixedday){
+					$info[$eid]['salary']  = $this->comp->getAdminSalaryPay($eid, $sdate, $edate);
+				}
+
+				$tardy_amount = $perdept_amt_arr['']['ADMIN']['late_amount'] ?? 0;
+				
 				$absent_amount = 0;
 			}
 
-			/**
-			 * @author Leandrei Santos
-			 * STMTCC Process
-			 * -Overwrite data dahil pina revise yung computation sa teaching
-			 * -tanggalin lang to kung ibabalik sa dati.
-			 */
-			$managePayroll = $this->getManagePayrollDataTeaching($payroll_cutoff_id,$tnt,$campus,$is_trelated,$office,
-																$deptid,$status,$company_campus,$employmentstat,$eid);
-			$info[$eid]['teaching_pay'] =  $managePayroll['lechour_wr'];
-			$tardy_amount = $managePayroll['tardy_ut_deduction'];
-			$absent_amount = $managePayroll['absent_deduction'];
-			$info[$eid]['overload'] = $managePayroll['overload_less_absent'];
+			if(!$is_trelated){
+				/**
+				 * @author Leandrei Santos
+				 * STMTCC Process
+				 * -Overwrite data dahil pina revise yung computation sa teaching
+				 * -tanggalin lang to kung ibabalik sa dati.
+				 */
+				$managePayroll = $this->getManagePayrollDataTeaching($payroll_cutoff_id,$tnt,$campus,$is_trelated,$office,
+																	$deptid,$status,$company_campus,$employmentstat,$eid);
+				$info[$eid]['teaching_pay'] =  $managePayroll['lechour_wr'];
+				$tardy_amount = $managePayroll['tardy_ut_deduction'];
+				$absent_amount = $managePayroll['absent_deduction'];
+				$info[$eid]['overload'] = $managePayroll['overload_less_absent'];
 
-			// Deduc the absent amount on teaching pay amount and hide the teaching absent
-			$info[$eid]['teaching_pay'] -= $absent_amount;
-			$absent_amount = 0;
+				// Deduc the absent amount on teaching pay amount and hide the teaching absent
+				$info[$eid]['teaching_pay'] = $info[$eid]['teaching_pay'] - $tardy_amount - $absent_amount;
+				$absent_amount = 0;
+				$tardy_amount = 0;
+			}
+			
 
+			if($fixedday){
+				$absent_amount = $absent_temp;
+			}
 
 		}else{
 			$is_trelated = $this->employee->isTeachingRelated($eid);
 			if(!$is_trelated){
-				list($tardy_amount,$absent_amount,$workdays,$x,$x,$conf_base_id, $isFinal) = $this->comp->getTardyAbsentSummaryNT($eid,$tnt,$schedule,$quarter,$sdate,$edate,$hourly,false,$daily);
-				$info[$eid]['salary'] 	= $this->comp->computeNTCutoffSalary($workdays,$fixedday,$regpay,$daily,$has_bdayleave,$minimum_wage);
+				list($tardy_amount,$absent_amount,$workdays,$x,$x,$conf_base_id, $isFinal, $day_absent, $workhours, $has_flexible) = $this->comp->getTardyAbsentSummaryNT($eid,$tnt,$schedule,$quarter,$sdate,$edate,$hourly,false,$daily);
+				$info[$eid]['salary'] 	= $this->comp->computeNTCutoffSalary($workdays,$fixedday,$regpay,$daily,$has_bdayleave,$minimum_wage, $day_absent, $workhours, $monthly, $has_flexible);
 				$info[$eid]['substitute'] = 0;
+
+				if($fixedday == 0){ // if daily remove the amount of absent
+					$absent_amount = 0; // the absent is already decrease by absent inside computeNTCutoffSalary
+				}
+
 			}else{
 				$perdept_salary = $this->comp->getPerdeptSalaryHistory($eid,$sdate);
 
@@ -398,7 +420,7 @@ class Payrollprocess extends CI_Model {
 		// $info[$eid]['overtime'] = $this->comp->computeOvertime($eid,$tnt,$schedule,$quarter,$sdate,$edate,$hourly);  ///< TO DO : INCLUDE OVERTIME IN COMPUTATIONS (income, tax, gross pay , etc)
 		list($info[$eid]['overtime'],$ot_det) = $this->comp->computeOvertime2($eid,$tnt,$hourly,$conf_base_id,$employmentstat);
 		/*check cutoff if no late and undertime*/
-
+		
 		$is_flexi = $this->attendance->isFlexiNoHours($eid);
 		if($this->validateDTRCutoff($sdate, $edate) || $is_flexi > 0) $tardy_amount = $absent_amount = 0;
 
@@ -425,8 +447,16 @@ class Payrollprocess extends CI_Model {
 			$holidayPay = $this->extras->isIncluded($dtrdate[0], $dtrdate[1], $eid) ? $this->extras->holidayCount($sdate, $edate, $eid) * $this->extras->getDaily($eid) : 0;
 		}
 
+		$suspension_pay = 0;
+		$hasSuspension = $this->extras->hasSuspension($dtrdate[0], $dtrdate[1]);
+		if ($hasSuspension) {
+			$hourly_rate = (float) $this->extras->getHourly($eid);
+			$suspension_hours = $this->extras->renderedWorkhoursSuspension($sdate, $edate, $eid);
+			$suspension_pay = round($hourly_rate * $suspension_hours, 2);
+		}
+
 		//<!--GROSS PAY-->
-		$info[$eid]['grosspay'] = ($info[$eid]['salary'] + $info[$eid]['teaching_pay'] + $totalincome + $info[$eid]['overtime'] ) + $holidayPay - $absent_amount - $tardy_amount;
+		$info[$eid]['grosspay'] = ($info[$eid]['salary'] + $info[$eid]['teaching_pay'] + $totalincome + $info[$eid]['overtime'] ) + $holidayPay + $suspension_pay - $absent_amount - $tardy_amount;
 
 		list($prevSalary,$prevGrosspay) = $this->getPrevCutoffSalary(date('Y-m',strtotime($sdate)),$quarter,$eid);
 		$prev_teaching_pay = $this->getPrevCutoffTeachingPay(date('Y-m',strtotime($sdate)),$quarter,$eid);
@@ -456,6 +486,10 @@ class Payrollprocess extends CI_Model {
 		if($wh_tax!="") $info[$eid]['whtax'] = $wh_tax;
 		else $info[$eid]['whtax']  = $this->comp->computeWithholdingTax($schedule,$dependents, $regpay, $info[$eid]['income'],$info[$eid]['income_adj'],$info[$eid]['deduction'],$info[$eid]['fixeddeduc'],$info[$eid]['overtime'], $info[$eid]['tardy'], $info[$eid]['absents']);
 
+		//Overtime adjustment
+		$cutoffid = $this->getCutoffID($sdate,$edate);
+		$adjOTAmount = $this->getOvertimeAdjustment($cutoffid,$eid);
+		$info[$eid]["overtime_adj"] = $adjOTAmount;
 
 		//<!--NET PAY-->
 		$info[$eid]['netpay'] = ($info[$eid]['grosspay'] - $totalloan - $totalfix - $total_deducSub - $info[$eid]['whtax']);
@@ -482,18 +516,53 @@ class Payrollprocess extends CI_Model {
 		$data_tosave['tardy'] 			= $info[$eid]['tardy'];
 		$data_tosave['absents'] 		= $info[$eid]['absents'];
 		$data_tosave['netbasicpay'] 	= $info[$eid]['netbasicpay'];
-		$data_tosave['gross'] 			= $info[$eid]['grosspay'];
+		$data_tosave['gross'] 			= (double)$info[$eid]['grosspay'] + (double) $adjOTAmount;
 		$data_tosave['net'] 			= $info[$eid]['netpay'];
 		$data_tosave['isHold'] 			= $info[$eid]['isHold'];
+		$data_tosave['overtime_adj'] 	= $adjOTAmount;
 
 		$data_tosave_oth['perdept_amt_arr'] = $perdept_amt_arr;
 		$data_tosave_oth['ee_er'] 		= $ee_er;
 		$data_tosave_oth['ot_det'] 		= $ot_det;
-
+		
 		$info[$eid]['base_id'] = $this->savePayrollCutoffSummaryDraft($data_tosave,$data_tosave_oth);
 		// echo "<pre>"; print_r($arr_income_config); die;
 		return array($info,$arr_income_config,$arr_income_adj_config,$arr_fixeddeduc_config,$arr_deduc_config,$arr_loan_config);
 	}
+
+	/**
+	 * Retrieves the cutoff ID for a given date range.
+	 *
+	 * @param string $dateFrom Start date in any valid format.
+	 * @param string $dateTo End date in any valid format.
+	 * @return mixed Cutoff ID if found, otherwise null.
+	 */
+	function getCutoffID($dateFrom, $dateTo)
+	{
+		// Convert dates to 'Y-m-d' format
+		$dateFrom = date('Y-m-d', strtotime($dateFrom));
+		$dateTo = date('Y-m-d', strtotime($dateTo));
+
+		// Execute query using parameterized statements to prevent SQL injection
+		$query = $this->db->query("
+			SELECT ID FROM cutoff 
+			WHERE CutoffFrom = ? 
+			AND CutoffTo = ?", 
+			[$dateFrom, $dateTo]
+		);
+
+		// Return the cutoff ID if found, otherwise null
+		return ($query->num_rows() > 0) ? $query->row()->ID : null;
+	}
+
+
+	function getOvertimeAdjustment($cutoffId,$empid)
+	{
+		$query = $this->db->query("SELECT amount FROM overtime_adjustment WHERE dtr_cutoff_id = '$cutoffId' AND employeeid = '$empid'");
+
+		return ($query->num_rows() > 0) ? $query->row()->amount : null;
+	}
+
 
 	function hasAttendanceConfirmed($teachingtype='',$filter=array()){
 		$hasData = false;
@@ -523,7 +592,7 @@ class Payrollprocess extends CI_Model {
 		// 	if(($utdept && $utdept != 'all') && ($utoffice && $utoffice != 'all')) $utwc = " AND  (FIND_IN_SET (deptid, '$utdept') OR FIND_IN_SET (office, '$utoffice'))";
 		// 	if(!$utdept && !$utoffice) $utwc =  " AND employeeid = 'nosresult'";
 		// 	$usercampus = $this->extras->getCampusUser();
-		// 	$utwc .= " AND FIND_IN_SET (campusid,'$usercampus') ";
+		// 	// $utwc .= " AND FIND_IN_SET (campusid,'$usercampus') ";
         // }
         if($utwc) $wC .= " AND employeeid IN (SELECT employeeid FROM employee WHERE 1 $utwc)";
 		if($checkCount){
@@ -670,7 +739,6 @@ class Payrollprocess extends CI_Model {
 		if(count($arr_loan) > 0){
 			foreach ($arr_loan as $code_loan => $loan_amount) {
 				$q_emp_loan = $this->loan->getEmployeeLoanPayment($employeeid, $code_loan, $cutoffstart, $cutoffend, $schedule, $quarter);
-				
 				foreach ($q_emp_loan as $row) {
 					$base_id = $row->id;
 
@@ -684,7 +752,7 @@ class Payrollprocess extends CI_Model {
 	///< PROCESSED STATUS
 	function finalizePayrollCutoffSummary($empid = "",$cutoffstart="", $cutoffend="", $schedule = "",$quarter = ""){
 		$user = $this->session->userdata('username');
-		$todate = date('Y-m-d');
+		$todate = date('Y-m-d H:i:s');
 		$update_res = $this->db->query("UPDATE payroll_computed_table SET status='PROCESSED', finalized_by = '$user', finalized_date = '$todate'
 										WHERE employeeid='$empid' AND schedule='$schedule' AND cutoffstart='$cutoffstart' AND cutoffend='$cutoffend' AND quarter='$quarter'");
 		$success = false;
@@ -733,11 +801,63 @@ class Payrollprocess extends CI_Model {
 		return $success;
 	}
 
+	///< PROCESSED STATUS
+	function finalizePayrollCutoffSummarySub($empid = "",$cutoffstart="", $cutoffend="", $schedule = "",$quarter = ""){
+		$user = $this->session->userdata('username');
+		$todate = date('Y-m-d');
+		$update_res = $this->db->query("UPDATE sub_payroll_computed_table SET status='PROCESSED', finalized_by = '$user', finalized_date = '$todate'
+										WHERE employeeid='$empid' AND schedule='$schedule' AND cutoffstart='$cutoffstart' AND cutoffend='$cutoffend' AND quarter='$quarter'");
+		$success = false;
+
+		if($update_res){
+			$sel_res = $this->db->query("SELECT * FROM sub_payroll_computed_table WHERE employeeid='$empid' AND schedule='$schedule' AND cutoffstart='$cutoffstart' AND cutoffend='$cutoffend' AND quarter='$quarter'");
+
+			if($sel_res->num_rows() > 0){
+
+				$pct_id 		= $sel_res->row()->id;
+				$loans 			= $sel_res->row()->loan;
+				$income 		= $sel_res->row()->income;
+				$income_adj 		= $sel_res->row()->income_adj;
+				$deductfixed 	= $sel_res->row()->fixeddeduc;
+				$deductothers 	= $sel_res->row()->otherdeduc;
+				$fixeddeduc_arr = array_sum($this->constructArrayListFromComputedTable($sel_res->row()->fixeddeduc));
+				$grosssalary 	=((int) $sel_res->row()->salary + (int) $sel_res->row()->income) - ((int) $sel_res->row()->otherdeduc+(int) $sel_res->row()->loan + $fixeddeduc_arr);
+				$netsalary 		=((int) $sel_res->row()->salary + (int) $sel_res->row()->income) - (((int) $sel_res->row()->absents + (int) $sel_res->row()->tardy));
+
+				$this->saveEmpLoanPayment($pct_id, $empid, $cutoffstart, $cutoffend, $schedule, $quarter, $loans);
+
+				$query = $this->db->query("INSERT INTO sub_payroll_computed_table_history 
+				                                    (employeeid,cutoffstart,cutoffend,schedule,quarter,salary,income,overtime,withholdingtax,fixeddeduc,otherdeduc,loan,tardy,absents,addedby) 
+				                            (SELECT employeeid,cutoffstart,cutoffend,schedule,quarter,salary,income,overtime,withholdingtax,fixeddeduc,otherdeduc,loan,tardy,absents,'$user'
+				                            FROM sub_payroll_computed_table WHERE employeeid='$empid' AND schedule='$schedule' AND cutoffstart='$cutoffstart' AND cutoffend='$cutoffend' AND quarter='$quarter')
+				                            ");
+
+
+				$uptloan      =   explode("/",$loans);
+				$uptincome    =   explode("/",$income);
+				$uptincome_adj    =   explode("/",$income_adj);
+				$uptcontri    =   explode("/",$deductfixed);
+				$uptothded    =   explode("/",$deductothers);
+
+				$this->finalizeLoan($empid,$schedule,$quarter,$cutoffstart,$cutoffend,$loans,$uptloan,$user);
+				$this->finalizeIncome($empid,$schedule,$quarter,$cutoffstart,$cutoffend,$income,$uptincome,$user);
+				$this->finalizeIncomeAdj($empid,$schedule,$quarter,$cutoffstart,$cutoffend,$income_adj,$uptincome_adj,$user);
+				$this->finalizeFixedDeduction($empid,$schedule,$quarter,$cutoffstart,$cutoffend,$deductfixed,$uptcontri,$user);
+				$this->finalizeOtherDeduction($empid,$schedule,$quarter,$cutoffstart,$cutoffend,$deductothers,$uptothded,$user);
+
+				if($query) $success = true;
+
+			}
+		}
+
+		return $success;
+	}
+
 	function finalizeLoan($eid='',$schedule = "",$quarter = "",$sdate = "",$edate = "",$loans='',$uptloan=array(),$user=''){
         if(count($uptloan) > 0 && !empty($loans)){
             for($x = 0; $x<count($uptloan); $x++){
                 $code = explode("=",$uptloan[$x]);
-                $qloan = $this->db->query("SELECT nocutoff,amount,famount FROM employee_loan WHERE employeeid='$eid' AND code_loan='".$code[0]."' AND schedule='$schedule' AND FIND_IN_SET(cutoff_period,'$quarter,3')");
+                $qloan = $this->db->query("SELECT nocutoff,amount,famount,currentamount FROM employee_loan WHERE employeeid='$eid' AND code_loan='".$code[0]."' AND schedule='$schedule' AND FIND_IN_SET(cutoff_period,'$quarter,3')");
                 if($qloan->num_rows() > 0){
                     $amount = $qloan->row(0)->amount; 
                     $famount = $qloan->row(0)->famount; 
@@ -748,7 +868,7 @@ class Payrollprocess extends CI_Model {
                 	if($skip_loan){
                 		$mode = "HOLD";
                 	}else{
-                    	$nocutoff = $qloan->row(0)->nocutoff-1; 
+                    	$nocutoff = $qloan->row(0)->currentamount / $qloan->row(0)->amount; 
                 	}
 
                     if($nocutoff >= 0){
@@ -782,9 +902,9 @@ class Payrollprocess extends CI_Model {
 		    for($x = 0; $x<count($uptincome); $x++){
 		        $code = explode("=",$uptincome[$x]);
 		        $qincome = $this->db->query("SELECT nocutoff FROM employee_income WHERE employeeid='$eid' AND code_income='".$code[0]."' AND schedule='$schedule' AND FIND_IN_SET(cutoff_period,'$quarter,3')");
-		        if($qincome->num_rows() > 0){
+		        if($qincome->num_rows() >= 0){
 		            $nocutoff = $qincome->row(0)->nocutoff-1; 
-		            if($nocutoff > 0){
+		            if($nocutoff >= 0){
 		                $qincome = $this->db->query("UPDATE employee_income SET nocutoff='$nocutoff' WHERE employeeid='$eid' AND code_income='".$code[0]."' AND schedule='$schedule' AND FIND_IN_SET(cutoff_period,'$quarter,3')");
 		                $pincome = $this->db->query("INSERT INTO payroll_process_income 
 		                                                    (employeeid,code_income,cutoffstart,cutoffend,amount,schedule,cutoff_period,remainingCutoff,user) 
@@ -856,8 +976,17 @@ class Payrollprocess extends CI_Model {
                                                         VALUES  ('$eid','".strtoupper($code[0])."','$sdate','$edate','".$code[1]."','$schedule','$quarter','$nocutoff','$user')
                                                     "); 
                     }             
-                }                                                                                           
-            	$remainingCutoff = $this->db->query("SELECT * FROM employee_deduction WHERE employeeid = '$eid' AND code_deduction = '{$code[0]}' ")->row()->nocutoff;
+                }              
+				
+				$remainingCutoff = 0;
+            	$query = $this->db->query("SELECT * FROM employee_deduction WHERE employeeid = '$eid' AND code_deduction = '{$code[0]}'");
+				
+				if ($query->num_rows() > 0) {
+					$remainingCutoff = $query->row()->nocutoff;
+				} else {
+					$remainingCutoff = null; // or set a default value
+				}
+
 				if($remainingCutoff == 0) $this->db->query("DELETE FROM employee_deduction WHERE employeeid = '$eid' AND code_deduction = '{$code[0]}' ");
             }
         }
@@ -894,14 +1023,13 @@ class Payrollprocess extends CI_Model {
 		$loan_config_q = $this->payroll->displayLoan();
 		$arr_loan_config = $this->constructArrayListFromStdClass($loan_config_q,'id','description');
 
-
-		// echo '<pre>';print_r($emplist);die;
 		foreach ($emplist as $row) {
 			$post_to_athena = 1;
 			$empid = $row->employeeid;
 			
 			///< check for computation
 			$res = $this->getPayrollSummarySub($status,$sdate,$edate,$schedule,$quarter,$empid,false,'',$bank);
+
 			if($res->num_rows() > 0){
 			// echo "<pre>"; print_r($this->db->last_query());
 			// 	die;
@@ -919,6 +1047,7 @@ class Payrollprocess extends CI_Model {
 
 				$arr_info[$empid]['salary'] 	= $res->salary;
 				$arr_info[$empid]['overtime'] 	= $res->overtime;
+				$arr_info[$empid]['overtime_adj'] 	= $res->overtime_adj;
 				$arr_info[$empid]['tardy'] 		= $res->tardy;
 				$arr_info[$empid]['absents'] 	= $res->absents;
 				$arr_info[$empid]['whtax'] 		= $res->withholdingtax;
@@ -992,7 +1121,11 @@ class Payrollprocess extends CI_Model {
 		return $data;
 	}
 
+
+
 	function getProcessedPayrollSummary($emplist=array(), $sdate='',$edate='',$schedule='',$quarter='',$status='PROCESSED',$bank=''){
+
+
 		//< initialize needed info ---------------------------------------------------
 		$arr_info    = $arr_income_config = $arr_incomeoth_config = $arr_deduc_config = $arr_fixeddeduc_config = $arr_loan_config = array();
 
@@ -1021,7 +1154,6 @@ class Payrollprocess extends CI_Model {
 		$loan_config_q = $this->payroll->displayLoan();
 		$arr_loan_config = $this->constructArrayListFromStdClass($loan_config_q,'id','description');
 
-
 		foreach ($emplist as $row) {
 			$post_to_athena = 1;
 			$empid = $row->employeeid;
@@ -1045,6 +1177,7 @@ class Payrollprocess extends CI_Model {
 
 				$arr_info[$empid]['salary'] 	= $res->salary;
 				$arr_info[$empid]['overtime'] 	= $res->overtime;
+				$arr_info[$empid]['overtime_adj'] 	= $res->overtime_adj;
 				$arr_info[$empid]['tardy'] 		= $res->tardy;
 				$arr_info[$empid]['absents'] 	= $res->absents;
 				$arr_info[$empid]['whtax'] 		= $res->withholdingtax;
@@ -1508,14 +1641,12 @@ class Payrollprocess extends CI_Model {
 				$this->db->query("DELETE FROM sub_payroll_computed_table WHERE cutoffstart='$sdate' AND cutoffend='$edate' AND schedule='$schedule' AND quarter='$quarter' AND employeeid='$eid' AND status='PENDING'");
 			}
 		}
-		// die;
 
 		foreach ($emplist as $row) {
 			$perdept_amt_arr = array();
 			$eid = $row->employeeid;
 
 			$check_saved_q = $this->getPayrollSummarySub('SAVED',$sdate,$edate,$schedule,$quarter,$eid,TRUE,'PROCESSED');
-			// echo $this->db->last_query();die;
 		
 			if(!$check_saved_q){
 

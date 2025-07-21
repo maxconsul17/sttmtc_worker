@@ -238,7 +238,7 @@ class Payrolloptions extends CI_Model {
         } 
         return Globals::_e($return);                  
     }
-    function quarter($quarterval = "",$visible = FALSE, $schedule = "", $isDisplaySelectQuarter = false){
+    function cutoffconfigquarter($quarterval = "",$visible = FALSE, $schedule = "", $isDisplaySelectQuarter = false){
         $return = "";
         if($schedule == 'weekly'){
             $quarter = array("0"=>"- Select -","1"=>"1st Cut-Off","2"=>"2nd Cut-Off");
@@ -248,7 +248,32 @@ class Payrolloptions extends CI_Model {
         else
             $quarter = array("0"=>"- Select -","1"=>"1st Cut-Off","2"=>"2nd Cut-Off");
         }else if($schedule == 'monthly'){
+            $quarter = array("0"=>"- Select -","3"=>"All Cut-Off");
+        }else{
             $quarter = array("0"=>"- Select -","1"=>"1st Cut-Off","2"=>"2nd Cut-Off");
+        }
+
+        if($isDisplaySelectQuarter) $return .= "<option value='0' selected>Select a Quarter</option>";
+
+        foreach($quarter as $quarter=>$desc){
+            if($quarterval == $quarter)
+                $return .= "<option value='$quarter' selected>$desc</option>";
+            else
+                $return .= "<option value='$quarter'>$desc</option>";
+        }
+        return $return;
+    }
+    function quarter($quarterval = "",$visible = FALSE, $schedule = "", $isDisplaySelectQuarter = false){
+        $return = "";
+        if($schedule == 'weekly'){
+            $quarter = array("0"=>"- Select -","1"=>"1st Cut-Off","2"=>"2nd Cut-Off");
+        }else if($schedule == 'semimonthly'){
+        if($visible)
+            $quarter = array("0"=>"- Select -","1"=>"1st Cut-Off","2"=>"2nd Cut-Off","3"=>"All Cut-Off");
+        else
+            $quarter = array("0"=>"- Select -","1"=>"1st Cut-Off","2"=>"2nd Cut-Off","3"=>"All Cut-Off");
+        }else if($schedule == 'monthly'){
+            $quarter = array("0"=>"- Select -","3"=>"All Cut-Off");
         }else{
             $quarter = array("0"=>"- Select -","1"=>"1st Cut-Off","2"=>"2nd Cut-Off");
         }
@@ -387,7 +412,7 @@ class Payrolloptions extends CI_Model {
     // finalized cut-off (used in payroll->process dtr)
     function displaycutofffinalized($type = "teaching", $data = array()){
         $return = "<option value=''>Select DTR Cut-Off Dates</option>";
-        if($type == "teaching")
+        if($type == "teaching" || $type == "trelated")
             //$query = $this->db->query("SELECT cutoffstart,cutoffend FROM attendance_confirmed WHERE (`status`='SUBMITTED' OR `status`='PROCESSED' ) GROUP BY cutoffstart DESC,cutoffend DESC")->result();
             $query = $this->db->query("SELECT a.`ID`,a.`CutoffFrom`,a.`CutoffTo`,a.`TPostedDate`,a.`NTPostedDate`,b.`schedule`,b.`quarter`,b.`startdate`,b.`enddate`,a.`ConfirmFrom`,a.`ConfirmTo` FROM cutoff AS a LEFT JOIN payroll_cutoff_config b ON(a.`ID` = b.`baseid`)  ORDER BY a.`CutOffFrom` DESC")->result();
         else
@@ -412,10 +437,40 @@ class Payrolloptions extends CI_Model {
         //from dtr to payroll cutoff
         $payrollcutoff = $this->extensions->getPayrollCutoffConfigArr($datas['payroll_cutoffstart'], $datas['payroll_cutoffend']);
         $return = "<option value=''>Select Payroll Cut-Off Dates</option>";
-        if($type == "teaching")
-            $query = $this->db->query("SELECT cutoffstart,cutoffend,payroll_cutoffstart,payroll_cutoffend FROM attendance_confirmed WHERE (`status`='SUBMITTED' OR `status`='PROCESSED' ) GROUP BY payroll_cutoffstart ORDER BY cutoffend DESC")->result();
+        if($type == "teaching" || $type == "trelated")
+            $query = $this->db->query("SELECT 
+                                        CutoffFrom AS cutoffstart,
+                                        CutoffTo AS cutoffend,
+                                        startdate AS payroll_cutoffstart,
+                                        enddate AS payroll_cutoffend 
+                                        FROM
+                                        cutoff a 
+                                        INNER JOIN payroll_cutoff_config b 
+                                            ON a.id = b.baseid 
+                                        WHERE startdate IN 
+                                        (SELECT 
+                                            payroll_cutoffstart 
+                                        FROM
+                                            attendance_confirmed
+                                        WHERE STATUS = 'SUBMITTED' 
+                                            OR STATUS = 'PROCESSED')")->result();
         else
-            $query = $this->db->query("SELECT cutoffstart,cutoffend,payroll_cutoffstart,payroll_cutoffend FROM attendance_confirmed_nt WHERE (`status`='SUBMITTED' OR `status`='PROCESSED' ) GROUP BY payroll_cutoffstart ORDER BY cutoffend DESC")->result();
+            $query = $this->db->query("SELECT 
+                                        CutoffFrom AS cutoffstart,
+                                        CutoffTo AS cutoffend,
+                                        startdate AS payroll_cutoffstart,
+                                        enddate AS payroll_cutoffend 
+                                        FROM
+                                        cutoff a 
+                                        INNER JOIN payroll_cutoff_config b 
+                                            ON a.id = b.baseid 
+                                        WHERE startdate IN 
+                                        (SELECT 
+                                            payroll_cutoffstart 
+                                        FROM
+                                            attendance_confirmed_nt 
+                                        WHERE STATUS = 'SUBMITTED' 
+                                            OR STATUS = 'PROCESSED')")->result();
         foreach($query as $data){
             $selected = "";
             if (($payrollcutoff[0] == $data->payroll_cutoffstart) && ($payrollcutoff[1] == $data->payroll_cutoffend)){
@@ -604,7 +659,6 @@ class Payrolloptions extends CI_Model {
         }
         return $return;
     }
-
     function displaypayrollcutoffdatasub($sched = "",$data = ""){
         $whereClause = "";
         $firstLoad = isset($data["firstLoad"]) ? $data["firstLoad"] : false;
@@ -790,7 +844,25 @@ class Payrolloptions extends CI_Model {
         }
         if($colname)    $whereClause .= " AND code_loan='$colname'";
         if($sdate && $edate)    $whereClause  .= " AND ((datefrom BETWEEN '$sdate' AND '$edate') OR (datefrom <= '$sdate')) AND datefrom <> '0000-00-00'  ";
-        $query = $this->db->query("SELECT IFNULL($title,0) as title, code_loan FROM employee_loan INNER JOIN payroll_loan_config b ON(b.id = code_loan) WHERE code_loan <> '' $whereClause AND nocutoff > 0 GROUP BY code_loan");
+        $query = $this->db->query("SELECT 
+                                        CASE 
+                                            WHEN '$title' = 'amount' THEN
+                                                CASE 
+                                                    WHEN bypass = 1 THEN IFNULL(bypass_amount, 0) 
+                                                    ELSE 
+                                                        CASE 
+                                                            WHEN amount > currentamount THEN IFNULL(currentamount, 0)
+                                                            ELSE IFNULL(amount, 0)
+                                                        END
+                                                END
+                                            ELSE IFNULL($title, 0)
+                                        END AS title, 
+                                        code_loan 
+                                    FROM employee_loan 
+                                    INNER JOIN payroll_loan_config b ON b.id = code_loan 
+                                    WHERE code_loan <> '' $whereClause AND nocutoff > 0 
+                                    GROUP BY code_loan");
+
         return $query;
    }
    
@@ -1038,5 +1110,83 @@ class Payrolloptions extends CI_Model {
         }
         return $return;
     }
-    
+
+    /**
+     * Retrieves the schedule from the cutoff table by joining with payroll_cutoff_config.
+     *
+     * This method performs an inner join between the 'cutoff' table (aliased as 'a')
+     * and the 'payroll_cutoff_config' table (aliased as 'b') on the matching 'id' and 'baseid'.
+     * It then filters the records where 'CutoffFrom' matches $sdate and 'CutoffTo' matches $edate.
+     *
+     * @param string $sdate The starting date for the cutoff period.
+     * @param string $edate The ending date for the cutoff period.
+     *
+     * @return mixed Returns the schedule if found; otherwise, returns false.
+     */
+    function dtrCutoffSchedule($sdate, $edate)
+    {
+        // Select the schedule field from the cutoff table.
+        $this->db->select('b.schedule');
+        
+        // Define the main table with an alias.
+        $this->db->from('cutoff a');
+        
+        // Join with the payroll_cutoff_config table using the matching id and baseid fields.
+        $this->db->join('payroll_cutoff_config b', 'a.id = b.baseid');
+        
+        // Add the where conditions for the date range.
+        $this->db->where('CutoffFrom', $sdate);
+        $this->db->where('CutoffTo', $edate);
+        
+        // Execute the query.
+        $q = $this->db->get();
+        
+        // If a matching record exists, return the schedule; otherwise, return false.
+        if ($q->num_rows() > 0) {
+            return $q->row()->schedule;
+        } else {
+            return false;
+        }
+    }
+
+    function quarterPayroll2($quarterval = "",$visible = FALSE, $schedule = "", $isDisplaySelectQuarter = false){
+        $return = "";
+       
+        $quarter = array("0"=>"- Select -","1"=>"1st Cut-Off","2"=>"2nd Cut-Off","3"=>"All Cut-Off");
+
+        if($isDisplaySelectQuarter) $return .= "<option value='0' selected>Select a Quarter</option>";
+
+        foreach($quarter as $quarter=>$desc){
+            if($quarterval == $quarter)
+                $return .= "<option value='$quarter' selected>$desc</option>";
+            else
+                $return .= "<option value='$quarter'>$desc</option>";
+        }
+        return $return;
+    }
+    function quarterNew($quarterval = "",$visible = FALSE, $schedule = "", $isDisplaySelectQuarter = false){
+        $return = "";
+        if($schedule == 'weekly'){
+            $quarter = array("0"=>"Select Quarter","1"=>"1st Cut-Off","2"=>"2nd Cut-Off");
+        }else if($schedule == 'semimonthly'){
+        if($visible)
+            $quarter = array("0"=>"Select Quarter","1"=>"1st Cut-Off","2"=>"2nd Cut-Off","3"=>"All Cut-Off");
+        else
+            $quarter = array("0"=>"Select Quarter","1"=>"1st Cut-Off","2"=>"2nd Cut-Off","3"=>"All Cut-Off");
+        }else if($schedule == 'monthly'){
+            $quarter = array("0"=>"Select Quarter","3"=>"All Cut-Off");
+        }else{
+            $quarter = array("0"=>"Select Quarter","1"=>"1st Cut-Off","2"=>"2nd Cut-Off");
+        }
+
+        if($isDisplaySelectQuarter) $return .= "<option value='0' selected>Select a Quarter</option>";
+
+        foreach($quarter as $quarter=>$desc){
+            if($quarterval == $quarter)
+                $return .= "<option value='$quarter' selected>$desc</option>";
+            else
+                $return .= "<option value='$quarter'>$desc</option>";
+        }
+        return $return;
+    }
 }

@@ -53,7 +53,6 @@ class Payroll extends CI_Model {
             }
 
             if($result) $this->insertEmpSalaryTrail($data);
-           
             $data['sss'] = $data['sss'] == '' ? 'NULL' : $data['sss'];
             $data['philhealth'] = $data['philhealth'] == '' ? 'NULL' : $data['philhealth'];
             $data['pagibig'] = $data['pagibig'] == '' ? 'NULL' : $data['pagibig'];
@@ -66,26 +65,150 @@ class Payroll extends CI_Model {
                                 array($data['eid'],$data['ssdesc'],$data['sssid'],$data['sss'],$data['sched'],(isset($data['sssq']) ? $data['sssq'] : 0),'HIDDEN',$data['sss_er']),
                                 array($data['eid'],$data['phdesc'],$data['philhealthid'],$data['philhealth'],$data['sched'],(isset($data['philhealthq']) ? $data['philhealthq'] : 0),'HIDDEN',$data['philhealth_er']),
                                 array($data['eid'],$data['pagibigdesc'],$data['pagibigid'],$data['pagibig'],$data['sched'],(isset($data['pagibigq']) ? $data['pagibigq'] : 0),'HIDDEN',$data['pagibig_er'])
-                               );
+                         );
+            
+            $query_employee_salary_history = $this->db->query("SELECT id FROM payroll_employee_salary_history WHERE employeeid = '$data[eid]' AND DATE(date_effective) = '{$data['date_effective']}'");
+            
+            if($query_employee_salary_history->num_rows() > 0){
+                $payroll_employee_salary_history_id = $query_employee_salary_history->row(0)->id;
+                $this->db->query("DELETE FROM employee_deduction_trail WHERE payroll_employee_salary_history_id = '$payroll_employee_salary_history_id'"); // DELETE ALL THE DEDUCTION HISTORY 
 
-            $query = $this->db->query("SELECT * FROM employee_deduction WHERE visibility='HIDDEN' AND employeeid='{$data['eid']}'");
-            if($query->num_rows() == 0){
-                foreach($deducarray as $key=>$row){
-                    $this->db->query("INSERT INTO employee_deduction (employeeid,code_deduction,memberid,amount,schedule,cutoff_period,visibility,amount_er) 
-                                      VALUES 
-                                     ('{$row[0]}' , '".strtoupper($row[1])."' , '{$row[2]}' , {$row[3]} , '{$row[4]}' , '{$row[5]}' , '{$row[6]}', {$row[7]}) ");       
+                foreach ($deducarray as $row) {
+                    $this->db->query("
+                        INSERT INTO employee_deduction_trail 
+                        (payroll_employee_salary_history_id, employeeid, code_deduction, memberid, amount, schedule, cutoff_period, visibility, amount_er) 
+                        VALUES (?, ?, UPPER(?), ?, ?, ?, ?, ?, ?)", 
+                        [
+                            $payroll_employee_salary_history_id, // payroll_employee_salary_history_id
+                            $row[0], // employeeid
+                            $row[1], // code_deduction (converted to uppercase)
+                            $row[2], // memberid,
+                            ($row[3] !== 'NULL' && $row[3] !== '0' ? $row[3] : null),
+                            $row[4], // schedule
+                            $row[5], // cutoff_period
+                            $row[6], // visibility,
+                            ($row[7] !== 'NULL' && $row[7] !== '0' ? $row[7] : null)
+                        ]
+                    );
                 }
-            }else{
-                foreach($deducarray as $key=>$row){
-                    $this->db->query("UPDATE employee_deduction SET  memberid='{$row[2]}', amount={$row[3]}, schedule='{$row[4]}', cutoff_period='{$row[5]}', amount_er={$row[7]} WHERE employeeid='{$row[0]}' AND code_deduction='".strtoupper($row[1])."' AND visibility='HIDDEN'");
-                }
+
+                $this->updateEmployeeDeduction($data['eid']);
             }
+
+            // $query = $this->db->query("SELECT * FROM employee_deduction WHERE visibility='HIDDEN' AND employeeid='{$data['eid']}'");
+            // if($query->num_rows() == 0){
+            //     foreach($deducarray as $key=>$row){
+            //         $this->db->query("INSERT INTO employee_deduction (employeeid,code_deduction,memberid,amount,schedule,cutoff_period,visibility,amount_er) 
+            //                           VALUES 
+            //                          ('{$row[0]}' , '".strtoupper($row[1])."' , '{$row[2]}' , {$row[3]} , '{$row[4]}' , '{$row[5]}' , '{$row[6]}', {$row[7]}) ");       
+            //     }
+            // }else{
+            //     foreach($deducarray as $key=>$row){
+            //         $this->db->query("UPDATE employee_deduction SET  memberid='{$row[2]}', amount={$row[3]}, schedule='{$row[4]}', cutoff_period='{$row[5]}', amount_er={$row[7]} WHERE employeeid='{$row[0]}' AND code_deduction='".strtoupper($row[1])."' AND visibility='HIDDEN'");
+            //     }
+            // }
         }else{
           $msg .= 'Failed to save. Payroll is already processed for the given date effective.';
         }
 
         if(!$msg) $msg = "Successfully saved.";
         return $msg;
+    }
+
+    function updateEmployeeDeduction($employeeid){
+        // Fetch the most recent salary record for the employee with a status of 1 (active) and an effective date on or before today.
+        $query_latest_salary = $this->db->query("
+            SELECT id, whtax
+            FROM payroll_employee_salary_history 
+            WHERE employeeid = '$employeeid' 
+            AND date_effective <= CURDATE() 
+            AND STATUS = 1 
+            ORDER BY date_effective DESC 
+            LIMIT 1
+        "); // This will get the most recent salary record.
+    
+        // Delete deductions with visibility set to 'HIDDEN' for the given employee.
+        $this->db->query("
+            DELETE FROM employee_deduction 
+            WHERE visibility='HIDDEN' 
+            AND employeeid='$employeeid'
+        ");
+
+        // Check if the query for the latest salary returned any rows.
+        if($query_latest_salary->num_rows() > 0){
+            // Retrieve the ID of, whtax the latest salary record.
+            $query_latest_salary_id = $query_latest_salary->row(0)->id;
+            $query_latest_salary_whtax = $query_latest_salary->row(0)->whtax;
+
+            // update witholding tax
+            $this->db->query("UPDATE payroll_employee_salary SET whtax = '$query_latest_salary_whtax' WHERE employeeid = '$employeeid'");
+    
+            // Get all hidden deductions associated with the latest salary record.
+            $employee_deduction_trail = $this->db->query("
+                SELECT * 
+                FROM employee_deduction_trail 
+                WHERE visibility='HIDDEN' 
+                AND payroll_employee_salary_history_id = '$query_latest_salary_id'
+            ");
+            
+            // If hidden deductions are found, process them.
+            if($employee_deduction_trail->num_rows() > 0){
+                // Initialize an empty array to store deduction data.
+                $deducarray = [];
+    
+                // Loop through each row in the deduction trail and store the data in the array.
+                foreach ($employee_deduction_trail->result_array() as $row) {
+                    // Create the deduction array for each row.
+                    $deducarray[] = [
+                        $row['employeeid'],       // Employee ID.
+                        $row['code_deduction'],   // Deduction code.
+                        $row['memberid'],         // Member ID.
+                        $row['amount'],           // Deduction amount.
+                        $row['schedule'],         // Deduction schedule.
+                        $row['cutoff_period'],    // Cutoff period.
+                        $row['visibility'],       // Visibility status.
+                        $row['amount_er']         // Employer amount.
+                    ];
+                }
+    
+                // Insert each deduction record into the employee_deduction table.
+                foreach($deducarray as $key => $row){
+                    $sql = "
+                        INSERT INTO employee_deduction 
+                        (employeeid, code_deduction, memberid, amount, schedule, cutoff_period, visibility, amount_er) 
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+
+                    $this->db->query($sql, [
+                        $row[0], 
+                        strtoupper($row[1]), 
+                        $row[2], 
+                        (!empty($row[3]) && $row[3] !== 'NULL' && $row[3] !== '0') ? $row[3] : null, 
+                        $row[4], 
+                        $row[5], 
+                        $row[6], 
+                        (!empty($row[7]) && $row[7] !== 'NULL' && $row[7] !== '0') ? $row[7] : null
+                    ]);    
+                }
+            }
+        }else{
+            // remove witholding tax if no salary history
+            $this->db->query("UPDATE payroll_employee_salary SET whtax = NULL WHERE employeeid = '$employeeid'");
+        }
+    }
+
+    public function getEmployeeSalaryHistoryDeduction($query_latest_salary_id){
+        $query = $this->db->query("
+                    SELECT 
+                        employeeid,
+                        COALESCE(SUM(CASE WHEN code_deduction = 'SSS' THEN amount END), 0) AS sss,
+                        COALESCE(SUM(CASE WHEN code_deduction = 'PHILHEALTH' THEN amount END), 0) AS philhealth,
+                        COALESCE(SUM(CASE WHEN code_deduction = 'PAGIBIG' THEN amount END), 0) AS pagibig
+                    FROM employee_deduction_trail
+                    WHERE payroll_employee_salary_history_id = '$query_latest_salary_id'
+                    GROUP BY employeeid
+                ");
+
+        return $query->result_array();
     }
 
     function insertEmpSalaryTrail($data=array(),$user=''){
@@ -316,7 +439,7 @@ class Payroll extends CI_Model {
         /*validate for default all */
         $data = $this->validate_aimsdept_rate(json_encode($data), $employeeid);
         $data = json_decode($data);
-
+        // Globals::pd($data); die;
         if($data){
             foreach ($data as $key => $row) {
                 $isall = isset($row->isall) ? 1 : 0;
@@ -1229,8 +1352,10 @@ class Payroll extends CI_Model {
        // $perdept = $this->db->query("UPDATE payroll_emp_salary_perdept_history status = '0' WHERE base_id='$id'");
        $perdept = '1';
        if($perdept) $salary = $this->db->query("UPDATE payroll_employee_salary_history SET status = '0' WHERE id='$id'");
-       if($salary)  $return = "Data Successfully Deleted!";
-       else         $return = "Failed to delete data!";
+       if($salary){
+            $return = "Data Successfully Deleted!";
+            $this->updateEmployeeDeduction($data['employeeid']);
+       }else $return = "Failed to delete data!";
        return $return;
     }
     // end
@@ -1321,7 +1446,11 @@ class Payroll extends CI_Model {
             'isIncluded' => isset($data['isIncluded']) ? $data['isIncluded'] : 0,
             'grosspayNotIncluded' => isset($data['grosspayNotIncluded']) ? $data['grosspayNotIncluded'] : 0,
             'user' =>  $this->session->userdata('username'),
-            'campus' =>  $this->db->campus_code
+            'campus' =>  $this->db->campus_code,
+
+            'isSSSIncluded' => isset($data['isSSSIncluded']) ? $data['isSSSIncluded'] : 0,
+            'isPhilhealthIncluded' => isset($data['isPhilHealthIncluded']) ? $data['isPhilHealthIncluded'] : 0,
+            'isPagibigIncluded' => isset($data['isPagibigIncluded']) ? $data['isPagibigIncluded'] : 0
         );
 
         extract($data);
@@ -1336,8 +1465,8 @@ class Payroll extends CI_Model {
             if ($query->num_rows() > 0) {
             // $this->db->query("UPDATE payroll_income_config SET description='$desc', incomeType='$incomeType', taxable='$wtax', grossinc='$gross',
             //                           ismainaccount='$ismainaccount', mainaccount='$mainaccount',deductedby='$deductedby',isIncluded = '$isIncluded', grosspayNotIncluded='$grosspayNotIncluded', gl_debit='$gl_debit', gl_credit='$gl_credit' WHERE id='$id'");
-            $this->db->query("UPDATE payroll_income_config SET description='$desc', incomeType='$incomeType', taxable='$wtax', grossinc='$gross',
-                                    ismainaccount='$ismainaccount', mainaccount='$mainaccount',deductedby='$deductedby',isIncluded = '$isIncluded', grosspayNotIncluded='$grosspayNotIncluded' WHERE id='$id'");
+            $this->db->query("UPDATE payroll_income_config SET description='$desc_cleaned', incomeType='$incomeType', taxable='$wtax', grossinc='$gross',
+                                    ismainaccount='$ismainaccount', mainaccount='$mainaccount',deductedby='$deductedby',isIncluded = '$isIncluded', sssIncluded = '$isSSSIncluded', philhealthIncluded = '$isPhilhealthIncluded', pagibigIncluded = '$isPagibigIncluded', grosspayNotIncluded='$grosspayNotIncluded' WHERE id='$id'");
                  $return = array(
                     "icon" => "success",
                     "title" => "Success",
@@ -1356,8 +1485,8 @@ class Payroll extends CI_Model {
             if($query->num_rows() == 0){
             // $this->db->query("INSERT INTO payroll_income_config (description,incomeType,taxable,grossinc,addedby,ismainaccount, mainaccount,deductedby,isIncluded,grosspayNotIncluded,gl_debit,gl_credit) 
             //                         VALUES ('$desc','$incomeType','$wtax','$gross','$user','$ismainaccount','$mainaccount','$deductedby','$isIncluded','$grosspayNotIncluded','$gl_debit','$gl_credit')");
-            $this->db->query("INSERT INTO payroll_income_config (description,incomeType,taxable,grossinc,addedby,ismainaccount, mainaccount,deductedby,isIncluded,grosspayNotIncluded) 
-                                    VALUES ('$desc','$incomeType','$wtax','$gross','$user','$ismainaccount','$mainaccount','$deductedby','$isIncluded','$grosspayNotIncluded')");
+            $this->db->query("INSERT INTO payroll_income_config (description,incomeType,taxable,grossinc,addedby,ismainaccount, mainaccount,deductedby,isIncluded,sssIncluded,philhealthIncluded,pagibigIncluded,grosspayNotIncluded) 
+                                    VALUES ('$desc_cleaned','$incomeType','$wtax','$gross','$user','$ismainaccount','$mainaccount','$deductedby','$isIncluded','$isSSSIncluded','$isPhilhealthIncluded','$isPagibigIncluded','$grosspayNotIncluded')");
                 $return = array(
                     "icon" => "success",
                     "title" => "Success",
@@ -1683,29 +1812,9 @@ function delIncome($data){
         $branch             =   $data['branch'];
         $comp_code             =   $data['comp_code'];
 
-        // This is for bypassing process if environment is not production
-        $proceed = false;
-        if(getenv("ENVIRONMENT") == "Production"){
-            // Load centralized model
-            // Check first yung description if existing
-            $this->load->model("centralized_api");
-            $result = $this->centralized_api->initSaveBankConfig($account_number, $bank_name, $branch, $comp_code, $code, $job);
-            
-            if(isset($result["error"])){
-                if($result["msg"] === "success"){
-                    // Return true if the process is completed in microservice
-                    // Kapag nag success lang yun saving sa microservice, tsaka lang mag proceed.
-                    $proceed = true;
-                    
-                }else{
-                    $return = "existing";
-                }
-            }else{
-                $return = "failed";
-            }
-        }else{
-            $proceed = true;
-        }
+
+        $proceed = true;
+        
         
         // FOR HRIS PROCESS
         /** ADDED NEW ALTER loanaccount **/
@@ -1959,7 +2068,7 @@ function delIncome($data){
     function displayIncome($id = ""){
         $whereClause = "";        
         if($id) $whereClause = " WHERE id='$id'";
-        $query = $this->db->query("SELECT id,description,taxable,incomeType,grossinc,ismainaccount,mainaccount,deductedby,isIncluded,grosspayNotIncluded,addedby,gl_debit,gl_credit FROM payroll_income_config $whereClause");
+        $query = $this->db->query("SELECT id,description,taxable,incomeType,grossinc,ismainaccount,mainaccount,deductedby,isIncluded,sssIncluded,philhealthIncluded,pagibigIncluded,grosspayNotIncluded,addedby,gl_debit,gl_credit FROM payroll_income_config $whereClause");
         return $query;
     }
     // income
@@ -2039,16 +2148,17 @@ function delIncome($data){
    /*
     * Load All Employee Data for Payroll
     */
-    function loadAllEmpbyDept($dept = "", $eid = "", $sched = "",$campus="",$company_campus="", $sdate = "", $edate = "", $sortby = "", $office="", $teachingtype="", $empstatus=""){
+   function loadAllEmpbyDept($dept = "", $eid = "", $sched = "",$campus="",$company_campus="", $sdate = "", $edate = "", $sortby = "", $office="", $teachingtype="", $empstatus="", $employmentstat= ""){
         $date = date('Y-m-d');
         $whereClause = $orderBy = $wC = "";
         if($sortby == "alphabetical") $orderBy = " ORDER BY fullname";
         if($sortby == "department") $orderBy = " ORDER BY d.description";
         if($dept)   $whereClause .= " AND b.deptid='$dept'";
         if($office)   $whereClause .= " AND b.office='$office'";
+        if($employmentstat)   $whereClause .= " AND b.employmentstat='$employmentstat'";
         if($teachingtype){ 
             if($teachingtype == "trelated") $whereClause .= " AND b.teachingtype='teaching' AND trelated = 1";
-            else $whereClause .= " AND b.teachingtype='$teachingtype'";
+            else $whereClause .= " AND b.teachingtype='$teachingtype' AND trelated = 0";
         }
         if($empstatus != "all" && $empstatus != ''){
             if($empstatus=="1"){
@@ -2087,7 +2197,7 @@ function delIncome($data){
         return $query;
    } 
 
-    function loadAllEmpbyDeptSample($dept = "", $eid = "", $sched = "",$campus="",$company_campus="", $sdate, $edate, $sortby = ""){
+    function loadAllEmpbyDeptSample($dept = "", $eid = "", $sched = "",$campus="",$company_campus="", $sdate, $edate, $sortby = "", $office="", $teachingtype="", $employmentstat=""){
         $date = date('Y-m-d');
         $whereClause = $orderBy = "";
         if($sortby == "alphabetical") $orderBy = " ORDER BY fullname";
@@ -2102,6 +2212,7 @@ function delIncome($data){
         $utoffice = $this->session->userdata("office");
         if($this->session->userdata("usertype") == "ADMIN"){
           if($utdept && $utdept != 'all') $utwc .= " AND  FIND_IN_SET (b.deptid, '$utdept')";
+          if($employmentstat && $employmentstat != 'all') $utwc .= " AND  FIND_IN_SET (b.employmentstat, '$employmentstat')";
           if($utoffice && $utoffice != 'all') $utwc .= " AND  FIND_IN_SET (b.office, '$utoffice')";
           if(($utdept && $utdept != 'all') && ($utoffice && $utoffice != 'all')) $utwc = " AND  (FIND_IN_SET (b.deptid, '$utdept') OR FIND_IN_SET (b.office, '$utoffice'))";
           if(!$utdept && !$utoffice) $utwc =  " AND b.employeeid = 'nosresult'";
@@ -2122,17 +2233,16 @@ function delIncome($data){
     } 
 
       /*employeelist for processed payroll*/
-      function loadAllEmpbyDeptForProcessed($dept = "", $eid = "", $sched = "",$campus="", $sortby="", $company="", $office="", $tnt="",$isSubSite=false, $employmentstat = ""){
+    function loadAllEmpbyDeptForProcessed($dept = "", $eid = "", $sched = "",$campus="", $sortby="", $company="", $office="", $tnt="",$isSubSite=false, $employmentstat = ""){
         $whereClause = $orderBy = "";
         if($sortby == "alphabetical") $orderBy = " ORDER BY fullname";
         if($sortby == "department") $orderBy = " ORDER BY c.description";
         if($dept)   $whereClause .= " AND b.deptid='$dept'";
         if($tnt){ 
             if($tnt == "trelated") $whereClause .= " AND b.teachingtype='teaching' AND trelated = 1";
-            else $whereClause .= " AND b.teachingtype='$tnt'";
+            else $whereClause .= " AND b.teachingtype='$tnt' AND trelated = 0";
         }
         if($office)   $whereClause .= " AND b.office='$office'";
-        if($employmentstat)   $whereClause .= " AND b.employmentstat='$employmentstat'";
         if($eid)    $whereClause .= " AND a.employeeid='$eid'";
         if($campus && $campus!="All" && !$isSubSite)    $whereClause .= " AND b.campusid='$campus'";
         if($company && $company != "all")    $whereClause .= " AND b.company_campus='$company'";
@@ -2914,6 +3024,7 @@ function delIncome($data){
                                       'daily' => $row->daily,
                                       'hourly' => $row->hourly,
                                       'minutely' => $row->minutely,
+                                      'whtax' => $row->whtax,
                                       'date_effective' => $row->date_effective,
                                       'status' => $row->status,
                                       'timestamp' => $row->timestamp
@@ -3025,7 +3136,7 @@ function delIncome($data){
         else return false;
     }
 
-    function loadAllEmpbyDeptForPayslip($dept = "", $eid = "", $sched = "",$sort = "", $payroll_cutoffstart ,$includeResigned=true,$adminside ='', $campus='', $company= '', $bank = '', $employmentstat = ""){
+    function loadAllEmpbyDeptForPayslip($dept = "", $eid = "", $sched = "",$sort = "", $payroll_cutoffstart ,$includeResigned=true,$adminside ='', $campus='', $company= '', $bank = '', $tnt = ''){
         $data = array();
         $whereClause = "";
         $old_empid = "";
@@ -3043,10 +3154,14 @@ function delIncome($data){
             }
         }
         if($campus && $campus!="All")   $whereClause .= " AND b.campusid = '$campus'";
-        if($employmentstat && $employmentstat!="All")   $whereClause .= " AND b.employmentstat = '$employmentstat'";
         if($company && $company != 'all')   $whereClause .= ' AND b.company_campus = "'.$company.'"';
         if($bank)   $whereClause .= " AND c.bank = '$bank'";
         else        $orderby .= " ORDER BY b.deptid, fullname, timestamp DESC";
+
+        if($tnt){ 
+            if($tnt == "trelated") $whereClause .= " AND b.teachingtype='teaching' AND trelated = 1";
+            else $whereClause .= " AND b.teachingtype='$tnt' AND trelated = 0";
+        }
   
         if(!$includeResigned) $whereClause .= " AND (b.dateresigned = '1970-01-01' OR b.dateresigned IS NULL OR b.dateresigned = '0000-00-00')"; //>>>Ticket MCU-Hyperion21453
         if($payroll_cutoffstart)          $whereClause .= " AND (dateresigned > '$payroll_cutoffstart' OR b.dateresigned = '1970-01-01' OR dateresigned IS NULL OR dateresigned = '0000-00-00')
@@ -3377,16 +3492,17 @@ function delIncome($data){
     /*
     * Load All Employee Data for Payroll
     */
-    function employeeListForSubSite($dept = "", $eid = "", $sched = "",$campus="",$company_campus="", $sdate = "", $edate = "", $sortby = "", $office="", $teachingtype="", $empstatus=""){
+    function employeeListForSubSite($dept = "", $eid = "", $sched = "",$campus="",$company_campus="", $sdate = "", $edate = "", $sortby = "", $office="", $teachingtype="", $empstatus="", $employmentstat = ""){
         $date = date('Y-m-d');
         $whereClause = $orderBy = $wC = "";
         if($sortby == "alphabetical") $orderBy = " ORDER BY fullname";
         if($sortby == "department") $orderBy = " ORDER BY d.description";
+        if($employmentstat)   $whereClause .= " AND b.employmentstat='$employmentstat'";
         if($dept) $whereClause .= " AND b.deptid='$dept'";
         if($office) $whereClause .= " AND b.office='$office'";
         if($teachingtype){ 
             if($teachingtype == "trelated") $whereClause .= " AND b.teachingtype='teaching' AND trelated = 1";
-            else $whereClause .= " AND b.teachingtype='$teachingtype'";
+            else $whereClause .= " AND b.teachingtype='$teachingtype' AND trelated = 0";
         }
         if($empstatus != "all" && $empstatus != ''){
             if($empstatus=="1"){
@@ -3433,4 +3549,366 @@ function delIncome($data){
     
         return $total_suspension; 
     }
+
+    /**
+     * Checks if the employee is on a daily rate based on the 'fixedday' column
+     * in the payroll_employee_salary table.
+     *
+     * @param string $employeeId The ID of the employee.
+     * @param string $startDate (Optional) The start date of the range.
+     * @param string $endDate   (Optional) The end date of the range.
+     * @return mixed The result of the query containing the 'fixedday' value, or false on failure.
+     * @author Leandrei Santos
+     */
+    public function isDailyRate($employeeId, $startDate = "", $endDate = "")
+    {
+        // Define the table and column to query
+        $tableName  = 'payroll_employee_salary';
+        $columnName = 'fixedday';
+
+        // Use parameterized queries to avoid SQL injection
+        $sql = "SELECT $columnName FROM $tableName WHERE employeeid = ?";
+        $query = $this->db->query($sql, [$employeeId]);
+
+        // Fetch the first row
+        $result = $query->row();
+
+        // Return the result of the query
+        return $result ? $result->$columnName : false;
+    }
+
+
+    // START: BATCH ENCODE SALARY
+    public function insertBESalary($data){
+        $data = (object) $data;
+        $data->schedule = strtolower($data->schedule);
+        $data->date_effective = date("Y-m-d", strtotime($data->date_effective));
+
+        try {
+            $insert_data = array(
+                'employeeid' => $data->employeeid,
+                'monthly' => $data->monthly,
+                'semimonthly' => $data->semimonthly,
+                'daily' => $data->daily,
+                'hourly' => $data->hourly,
+                'minutely' => $data->minutely,
+                'schedule' => $data->schedule,
+                "lechour" => $data->lechour,
+                "labhour" => $data->labhour,
+                "rlehour" => $data->rlehour,
+                'date_effective' => $data->date_effective,
+                'addedby' => $data->addedby,
+                // Add other fields as needed
+            );
+
+            // Insert data into payroll_employee_salary table
+            $this->db->insert('payroll_employee_salary', $insert_data);
+
+
+            // Fetch the ID of the inserted record
+            $insertedId = $this->db->insert_id();
+
+            // Add the 'base_id' to the $insert_data array
+            $this->db->insert('payroll_employee_salary_history', $insert_data);
+
+            // payroll_emp_salary_perdept
+            $perdept_data = array(
+                "base_id" => $insertedId,
+                'employeeid' => $data->employeeid,
+                'aimsdept' => $data->aimsdept,
+                "lechour" => $data->lechour,
+                "labhour" => $data->labhour,
+                "rlehour" => $data->rlehour,
+                'isall' => 0,
+                'editedby' => $data->addedby,
+                'campus' => $data->campus,
+            );
+
+            $query = $this->db->insert('payroll_emp_salary_perdept', $perdept_data);
+            $this->db->insert('payroll_emp_salary_perdept_history', $perdept_data);
+
+            return $query;
+          
+        }  catch (Exception $e) {
+            // Handle the exception as needed
+            log_message('error', 'Exception in insertBESalary: ' . $e->getMessage());
+        }
+
+    }
+
+    public function updateBESalary($data, $id) {
+        $data = (object) $data;
+        $data->schedule = strtolower($data->schedule);
+        $data->date_effective = date("Y-m-d", strtotime($data->date_effective));
+    
+        try {
+
+            // Update the payroll_employee_salary table
+            $updatedId = $id;
+            $this->db->where('employeeid', $data->employeeid);
+            $this->db->update('payroll_employee_salary', array(
+                'monthly' => $data->monthly,
+                'semimonthly' => $data->semimonthly,
+                'daily' => $data->daily,
+                'hourly' => $data->hourly,
+                'minutely' => $data->minutely,
+                'schedule' => $data->schedule,
+                'date_effective' => $data->date_effective,
+                'timestamp' => $data->timestamp,
+                "lechour" => $data->lechour,
+                "labhour" => $data->labhour,
+                "rlehour" => $data->rlehour,
+                "addedby" => $data->addedby
+            ));
+    
+            // Use the ID to update the payroll_emp_salary_perdept table
+            $this->db->where('base_id', $updatedId);
+            $this->db->delete("payroll_emp_salary_perdept");
+
+            $this->db->where('base_id', $updatedId);
+            $this->db->delete("payroll_emp_salary_perdept_history");
+            $perdept_data = array(
+                "base_id" => $updatedId,
+                'employeeid' => $data->employeeid,
+                'aimsdept' => $data->aimsdept,
+                "lechour" => $data->lechour,
+                "labhour" => $data->labhour,
+                "rlehour" => $data->rlehour,
+                'editedby' => $data->addedby,
+                'campus' => $data->campus,
+                'isall' => "0"
+
+            );
+
+            $query = $this->db->insert('payroll_emp_salary_perdept', $perdept_data);
+            $this->db->insert('payroll_emp_salary_perdept_history', $perdept_data);
+
+            return $query;
+            
+        } catch (Exception $e) {
+            // Handle the exception as needed
+            log_message('error', 'Exception in updateBESalary: ' . $e->getMessage());
+        }
+    }
+    // END: BATCH ENCODE SALARY
+
+    // START: BATCH ENCODE DEDUCTION
+    public function insertBEDeduction($data){
+        $data = (object) $data;
+
+        try {
+
+            $insertData = array(
+                "employeeid" => $data->employeeid,
+                "code_deduction" => $data->deductionKeyCode,
+                "datefrom" => date("Y-m-d", strtotime($data->deductionDate)),
+                "amount" => $data->amount, 
+                "amount_er" => $data->amount, 
+                "nocutoff" => $data->numberOfCutoff, 
+                "cutoff_period" => $data->quarter,
+                "modified_by" => $data->addedby
+            );
+            $query = $this->db->insert('employee_deduction', $insertData);
+
+            $insertDataHistory = array(
+                "employeeid" => $data->employeeid,
+                "code_deduction" => $data->deductionKeyCode,
+                "datefrom" => date("Y-m-d", strtotime($data->deductionDate)),
+                "amount" => $data->amount, 
+                "nocutoff" => $data->numberOfCutoff, 
+                "cutoff_period" => $data->quarter,
+                "userid" => $data->addedby,
+                'status' => "SAVED"
+            );
+            $this->db->insert('employee_deduction_history', $insertDataHistory);
+
+            return $query;
+
+        } catch (Exception $e) {
+            // Handle the exception as needed
+            echo "<pre>"; print_r($e);die;
+            log_message('error', 'Exception in insertBEDeduction: ' . $e->getMessage());
+        }
+    }
+
+    public function updateBEDeduction($data){
+        $data = (object) $data;
+
+        try {
+
+            $this->db->where('employeeid', $data->employeeid);
+            $this->db->where('code_deduction', $data->deductionKeyCode);
+            $query = $this->db->update('employee_deduction', array(
+                "code_deduction" => $data->deductionKeyCode,
+                "datefrom" => date("Y-m-d", strtotime($data->deductionDate)),
+                "amount" => $data->amount, 
+                "amount_er" => $data->amount, 
+                "nocutoff" => $data->numberOfCutoff, 
+                "cutoff_period" => $data->quarter,
+                "modified_by" => $data->addedby, 
+                "date_modified" => $data->timestamp
+            ));
+
+            return $query;
+
+        } catch (Exception $e) {
+            // Handle the exception as needed
+            log_message('error', 'Exception in updateBEDeduction: ' . $e->getMessage());
+        }
+    }
+    // END: BATCH ENCODE DEDUCTION
+
+    // START: BATCH ENCODE LOAN
+    public function insertBELoan($data){
+        $data = (object) $data;
+        try {
+
+            $insertData = array(
+                'employeeid' => $data->employeeid,
+                'code_loan' => $data->code_loan,
+                "datefrom" => date("Y-m-d",strtotime($data->datefrom)),
+                "dateto" => date("Y-m-d",strtotime($data->dateto)),
+                "amount" => $data->amount,
+                "startingamount" => $data->startingamount,
+                "currentamount" => $data->currentamount,
+                "nocutoff" => $data->noofcutoff,
+                "schedule" => $data->schedule,
+                "cutoff_period" => $data->cutoff_period,
+                "modified_by" => $data->modified_by
+            );
+
+            $query = $this->db->insert('employee_loan', $insertData);
+            $insertedId = $this->db->insert_id();
+
+            $this->db->insert('employee_loan_history', array(
+                "base_id" => $insertedId,
+                "employeeid" => $data->employeeid,
+                'code_loan' => $data->code_loan,
+                "cutoffstart" => date("Y-m-d",strtotime($data->datefrom)),
+                "cutoffend" => date("Y-m-d",strtotime($data->dateto)),
+                "amount" => $data->amount,
+                "startBalance" => $data->startingamount,
+                "currentBalance" => $data->currentamount,
+                "schedule" => $data->schedule,
+                "cutoff_period" => $data->cutoff_period,
+                "user" => $data->modified_by
+            ));
+
+            return $query;
+
+        } catch (Exception $e) {
+            // Handle the exception as needed
+            log_message('error', 'Exception in insertBELoan: ' . $e->getMessage());
+        }
+
+    
+    }
+
+    public function updateBELoan($data){
+        $data = (object) $data;
+        try {
+           
+            $updatedId = $this->db->insert_id();
+            $this->db->where('employeeid', $data->employeeid);
+            $this->db->where('code_loan', $data->code_loan);
+            $this->db->update('employee_loan', array(
+                "code_loan" => $data->code_loan,
+                "datefrom" => date("Y-m-d",strtotime($data->datefrom)),
+                "dateto" => date("Y-m-d",strtotime($data->dateto)),
+                "amount" => $data->amount,
+                "startingamount" => $data->startingamount,
+                "currentamount" => $data->currentamount,
+                "nocutoff" => $data->noofcutoff,
+                // "cutoff_period" => $data->cutoff_period,
+                "date_modified" => $data->timestamp,
+                "modified_by" => $data->modified_by
+            ));
+
+        } catch (Exception $e) {
+            // Handle the exception as needed
+            log_message('error', 'Exception in updateBELoan: ' . $e->getMessage());
+        }
+    
+    }
+    public function isContri($eid){
+		return $this->db->query("SELECT * FROM global_payroll_contribution_status WHERE status = '1' AND employeeid = '$eid'")->num_rows();
+	}
+    public function isContriExist($eid){
+        $campus_code = $this->db->campus_code;
+        $qsites = $this->db->query("SELECT CONCAT(campusid, IF(subcampusid IS NOT NULL AND subcampusid != '' AND subcampusid != 'null', CONCAT(',', subcampusid), '')) AS allcampus FROM employee WHERE employeeid = '$eid'")->row(0)->allcampus;
+		// $sites = Globals::sites();
+        // Globals::pd($this->db->last_query());die;
+        // Globals::pd($qsites);die;
+		$sites = explode(",", $qsites);
+        $other_sites = array_filter($sites, function($key) use($campus_code) {
+            return $key != $campus_code;
+        }, ARRAY_FILTER_USE_BOTH);
+
+        $count = 0;
+
+        if($other_sites && in_array(getenv("ENVIRONMENT"), ["Production", "Staging"])){
+            try{
+                foreach($other_sites as $code){
+                    $endpoint = Globals::campusEndpoints($code);
+                    $api_url = $endpoint."Api_/checkOtherSiteContri";
+                    // $api_url = "http://192.168.2.236:9042/index.php/"."Api_/checkOtherSiteContri";
+    
+                    $payload = [
+                        "client_secret" => "Y2M1N2E4OGUzZmJhOWUyYmIwY2RjM2UzYmI4ZGFiZjk=",
+                        "username" => "hyperion",
+                        "password" => "@stmtccHyperion2024",
+                        "eid" => $eid,
+                    ];
+    
+                    $curl = curl_init();
+                    curl_setopt_array($curl, array(
+                    CURLOPT_URL => $api_url,
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_ENCODING => "",
+                    CURLOPT_MAXREDIRS => 10,
+                    CURLOPT_TIMEOUT => 30,
+                    CURLOPT_SSL_VERIFYHOST => false,
+                    CURLOPT_SSL_VERIFYPEER => false,
+                    CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+                    CURLOPT_CUSTOMREQUEST => "POST",
+                    CURLOPT_POSTFIELDS => json_encode($payload),
+                    CURLOPT_HTTPHEADER => array(
+                        "Accept: application/json",
+                        ),
+                    ));
+    
+                    $result = curl_exec($curl);
+                    $response = json_decode($result);
+                    $err = curl_error($curl);
+
+                    if ($response == 1){
+                        $count ++;
+                    }
+                    curl_close($curl);
+                }
+
+                return json_encode(array(
+                    "err" => 0,
+                    "message" => $count
+                ));
+            }catch (Exception $e) {
+                var_dump($e);
+    
+                return json_encode(array(
+                    "err" => 1,
+                    "message" => 0
+                ));
+            }
+        }else{
+            $qData = array(
+                'employeeid'   => $eid,
+                'status' => '1'
+            );
+    
+            $this->db->replace("global_payroll_contribution_status", $qData);
+        }
+
+	}
+    // END: BATCH ENCODE LOAN
+
 }

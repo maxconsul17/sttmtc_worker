@@ -240,6 +240,20 @@ class Api extends CI_Model {
 							"details" => json_encode($logs_d),
 							"status" => "has curl error"
 						);
+
+						// ADD THIS CODE TO QUE FAILED ATTEMPT TO SEND LOGS TO OTHER SITE
+						$logs_d = (array) $logs_d;
+						$logs_d["client_secret"] = getenv("API_CLIENT_SECRET");
+						$logs_d["username"] = getenv("API_USERNAME");
+						$logs_d["password"] = getenv("API_PASSWORD");
+						$que_d = array(
+							"body" => json_encode($logs_d),
+							"status" => "pending",
+							"try" => 3,
+							"processed_by" => $this->session->userdata("username"),
+						);
+
+						$this->db->insert("facial_log_que", $que_d);
 					}
 					
 					$this->db->insert("transfer_logs_trail", $trail);
@@ -270,21 +284,23 @@ class Api extends CI_Model {
 			);
 
 			$this->db->insert("facial_log_que", $trail);
+
+			Globals::pd($this->db->last_query());
 		}
 	}
 
-	public function cancelOnlineApplicationToOtherSite($other_sites, $payload){
+	public function cancelOnlineApplicationToOtherSite($other_sites, $temp_payload){
 		try{
 			foreach($other_sites as $code){
 				$endpoint = Globals::campusEndpoints($code);
-				$api_url = $endpoint."Api_/cancel_online_application_to_other_sites_post";
+				$api_url = $endpoint."Api_/cancel_online_application_to_other_sites";
 				$token = Globals::hrisAccessToken($endpoint);
 
 				$payload = [
 					"client_secret" => "Y2M1N2E4OGUzZmJhOWUyYmIwY2RjM2UzYmI4ZGFiZjk=",
 					"username" => "hyperion",
 					"password" => "@stmtccHyperion2024",
-					"data" => $payload,
+					"data" => $temp_payload,
 				];
 
 				$curl = curl_init();
@@ -357,4 +373,265 @@ class Api extends CI_Model {
 			var_dump($e);
 		}
 	}
+
+
+	public function syncLogsFromMain($payload){
+		$this->load->model("facial");
+		$this->load->model("timesheet");
+		$campus_code = $this->db->campus_code;
+		$sites = explode(",", $payload['campusid']);
+		$sites = array_filter($sites, function($site) use($campus_code) {
+			return $site != $campus_code;
+		});
+
+		$has_error = false;
+
+		unset($payload['campusid']);
+
+		try{
+			foreach($sites as $site){
+				$endpoint = Globals::campusEndpoints($site);
+				$api_url = $endpoint."Api_/sync_employee_attendance";
+				$token = Globals::hrisAccessToken($endpoint);
+
+				$payload = array_merge($payload, [
+					"client_secret" => "Y2M1N2E4OGUzZmJhOWUyYmIwY2RjM2UzYmI4ZGFiZjk=",
+					"username" => "hyperion",
+					"password" => "@stmtccHyperion2024",
+					'campusid' => $site,
+				]);
+
+				$curl = curl_init();
+				curl_setopt_array($curl, array(
+				CURLOPT_URL => $api_url,
+				CURLOPT_RETURNTRANSFER => true,
+				CURLOPT_ENCODING => "",
+				CURLOPT_MAXREDIRS => 10,
+				CURLOPT_TIMEOUT => 30,
+				CURLOPT_SSL_VERIFYHOST => false,
+				CURLOPT_SSL_VERIFYPEER => false,
+				CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+				CURLOPT_CUSTOMREQUEST => "POST",
+				CURLOPT_POSTFIELDS => json_encode($payload),
+				CURLOPT_HTTPHEADER => array(
+					"Accept: application/json",
+					"Authorization: Bearer $token",
+					),
+				));
+
+				$result = curl_exec($curl);
+				$response = json_decode($result, true);
+				$err = curl_error($curl);
+
+				if ($err === "") {
+					$facialLogs = $this->facial->filterDuplicates($response['facialLog']);
+					$timesheetLogs = $this->timesheet->filterDuplicates($response['timesheet']);
+
+					$this->db->insert_batch("facial_Log", $facialLogs);
+					$this->db->insert_batch("timesheet", $timesheetLogs);
+				} else {
+					$has_error = true;
+				}
+
+				curl_close($curl);
+			}
+		}catch (Exception $e) {
+			var_dump($e);
+
+			echo json_encode(array(
+				"err" => 1,
+				"message" => "Failed to sync logs. Please check the data or try again."
+			));
+			return;
+		}
+
+		if($has_error) {
+			echo json_encode(array(
+				"err" => 1,
+				"message" => "Failed to sync logs. Please check the data or try again."
+			));
+			return;
+		}
+
+		echo json_encode(array(
+			"err" => 0,
+			"message" => "Logs synced successfully."
+		));
+		return;
+	}
+
+	public function getOtherSiteIncomeContri($schedule,$cutoff_period,$empid,$sdate,$edate,$included){
+		$campus_code = $this->db->campus_code;
+		$qsites = $this->db->query("SELECT CONCAT(campusid, IF(subcampusid IS NOT NULL AND subcampusid != '' AND subcampusid != 'null', CONCAT(',', subcampusid), '')) AS allcampus FROM employee WHERE employeeid = '$empid'")->row(0)->allcampus;
+
+		$sites = explode(",", $qsites);
+        $other_sites = array_filter($sites, function($key) use($campus_code) {
+            return $key != $campus_code;
+        }, ARRAY_FILTER_USE_BOTH);
+
+		$gross = 0;
+		
+		try{
+			foreach($other_sites as $code){
+				$endpoint = Globals::campusEndpoints($code);
+				$api_url = $endpoint."Api_/get_other_site_income_contri";
+				// $api_url = "http://192.168.2.236:9043/index.php/"."Api_/get_other_site_salary";
+
+				$payload = [
+					"client_secret" => "Y2M1N2E4OGUzZmJhOWUyYmIwY2RjM2UzYmI4ZGFiZjk=",
+					"username" => "hyperion",
+					"password" => "@stmtccHyperion2024",
+					"schedule" => $schedule,
+					"cutoff_period" => $cutoff_period,
+					"empid" => $empid,
+					"sdate" => $sdate,
+					"edate" => $edate,
+					"included" => $included,
+				];
+
+				$curl = curl_init();
+				curl_setopt_array($curl, array(
+				CURLOPT_URL => $api_url,
+				CURLOPT_RETURNTRANSFER => true,
+				CURLOPT_ENCODING => "",
+				CURLOPT_MAXREDIRS => 10,
+				CURLOPT_TIMEOUT => 30,
+				CURLOPT_SSL_VERIFYHOST => false,
+				CURLOPT_SSL_VERIFYPEER => false,
+				CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+				CURLOPT_CUSTOMREQUEST => "POST",
+				CURLOPT_POSTFIELDS => json_encode($payload),
+				CURLOPT_HTTPHEADER => array(
+					"Accept: application/json",
+					),
+				));
+
+				$result = curl_exec($curl);
+				$response = json_decode($result);
+				$err = curl_error($curl);
+
+				curl_close($curl);
+
+				if ($response){
+					if ($response->gross){
+						$gross += $response->gross;
+					}
+				}
+			}
+			return $gross;
+		}catch (Exception $e) {
+			return $gross;
+		}
+	}
+
+	public function getOtherSiteSalary($eid,$sdate){
+		$campus_code = $this->db->campus_code;
+		$qsites = $this->db->query("SELECT CONCAT(campusid, IF(subcampusid IS NOT NULL AND subcampusid != '' AND subcampusid != 'null', CONCAT(',', subcampusid), '')) AS allcampus FROM employee WHERE employeeid = '$eid'")->row(0)->allcampus;
+
+		$sites = explode(",", $qsites);
+        $other_sites = array_filter($sites, function($key) use($campus_code) {
+            return $key != $campus_code;
+        }, ARRAY_FILTER_USE_BOTH);
+
+		$lecrate = $monthly = 0;
+		
+		try{
+			foreach($other_sites as $code){
+				$endpoint = Globals::campusEndpoints($code);
+				$api_url = $endpoint."Api_/get_other_site_salary";
+				// $api_url = "http://192.168.2.236:9043/index.php/"."Api_/get_other_site_salary";
+
+				$payload = [
+					"client_secret" => "Y2M1N2E4OGUzZmJhOWUyYmIwY2RjM2UzYmI4ZGFiZjk=",
+					"username" => "hyperion",
+					"password" => "@stmtccHyperion2024",
+					"eid" => $eid,
+					"sdate" => $sdate,
+				];
+
+				$curl = curl_init();
+				curl_setopt_array($curl, array(
+				CURLOPT_URL => $api_url,
+				CURLOPT_RETURNTRANSFER => true,
+				CURLOPT_ENCODING => "",
+				CURLOPT_MAXREDIRS => 10,
+				CURLOPT_TIMEOUT => 30,
+				CURLOPT_SSL_VERIFYHOST => false,
+				CURLOPT_SSL_VERIFYPEER => false,
+				CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+				CURLOPT_CUSTOMREQUEST => "POST",
+				CURLOPT_POSTFIELDS => json_encode($payload),
+				CURLOPT_HTTPHEADER => array(
+					"Accept: application/json",
+					),
+				));
+
+				$result = curl_exec($curl);
+				$response = json_decode($result);
+				$err = curl_error($curl);
+
+				curl_close($curl);
+
+				if ($response){
+					if ($response->salary){
+						if ($response->schedHrs){
+							$lecrate += ($response->salary->lechour * $response->schedHrs) * 4;
+						}
+						if ($response->hasAdminSched){
+							$monthly += $response->salary->monthly;
+						}
+					}
+				}
+			}
+			return array($lecrate,$monthly);
+		}catch (Exception $e) {
+			return array($lecrate,$monthly);
+		}
+	}
+
+	public function calculateEmployeeAttendanceToOtherSite($other_sites, $employee_id, $dfrom, $dto){
+		try{
+			$temp_payload = [$employee_id, $dfrom, $dto];
+
+			foreach($other_sites as $code){
+				$endpoint = Globals::campusEndpoints($code);
+				$api_url = $endpoint."Api_/calculate_employee_attendance";
+				$token = Globals::hrisAccessToken($endpoint);
+
+				$payload = [
+					"client_secret" => "Y2M1N2E4OGUzZmJhOWUyYmIwY2RjM2UzYmI4ZGFiZjk=",
+					"username" => "hyperion",
+					"password" => "@stmtccHyperion2024",
+					"data" => $temp_payload,
+				];
+
+				$curl = curl_init();
+				curl_setopt_array($curl, array(
+				CURLOPT_URL => $api_url,
+				CURLOPT_RETURNTRANSFER => true,
+				CURLOPT_ENCODING => "",
+				CURLOPT_MAXREDIRS => 10,
+				CURLOPT_TIMEOUT => 30,
+				CURLOPT_SSL_VERIFYHOST => false,
+				CURLOPT_SSL_VERIFYPEER => false,
+				CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+				CURLOPT_CUSTOMREQUEST => "POST",
+				CURLOPT_POSTFIELDS => json_encode($payload),
+				CURLOPT_HTTPHEADER => array(
+					"Accept: application/json",
+					"Authorization: Bearer $token",
+					),
+				));
+
+				$result = curl_exec($curl);
+				$response = json_decode($result);
+				$err = curl_error($curl);
+
+				curl_close($curl);
+			}
+		}catch (Exception $e) {
+			var_dump($e);
+		}
+	}
+
 }
