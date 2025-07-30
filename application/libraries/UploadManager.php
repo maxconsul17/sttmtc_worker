@@ -94,6 +94,10 @@ class UploadManager
 
                 $today = date('Y-m-d');
 
+
+                  // TAG WHO IS CURRENTLY PROCESSING
+                $this->worker_model->updateUploadCurrentProcessing($uploadJob->base_id, $emp_id."-".$log_date);
+
                 if (!empty($log_date)) {
                     $date_format = DateTime::createFromFormat('m/d/Y', $log_date);
 

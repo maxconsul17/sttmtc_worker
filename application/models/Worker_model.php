@@ -322,10 +322,15 @@ class Worker_model extends CI_Model {
     }
 
     public function getAttendanceJob(){
-        $result = $this->db->where("(status = 'pending' OR status = 'ongoing')")
+        $result = $this->db->where("(status = 'pending' OR status = 'ongoing') AND try > 0 AND att_list_id IS NOT NULL")
             ->order_by('timestamp', 'ASC')
             ->get($this->tables[3])
             ->row();
+        echo "<pre>";
+        print_r($this->db->last_query());
+        echo "<pre>";
+        print_r($result);
+        die;
         return $result ? $result : false;
     }
 
@@ -402,11 +407,12 @@ class Worker_model extends CI_Model {
     }
 
 
-        public function updateUploadStatus($upload_id, $status="done"){
+    public function updateUploadStatus($upload_id, $status="done"){
         $this->db->where("id", $upload_id);
         $this->db->set("status", $status);
         if($status == "done"){
             $this->db->set("done_time", $this->getServerTime());
+            $this->db->set("current_processing", "");
         }
         $this->db->update("upload_list");
     }
@@ -440,6 +446,13 @@ class Worker_model extends CI_Model {
         );
 
         return $this->db->insert('upload_list_data_error', $data);
+    }
+
+    
+     public function updateUploadCurrentProcessing($upload_id, $details){
+        $this->db->where("id", $upload_id);
+        $this->db->set("current_processing", $details);
+        $this->db->update("upload_list");
     }
 
 
