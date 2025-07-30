@@ -36,7 +36,7 @@ class UploadManager
     }
 
     public function processUpload($uploadJob, $worker_id){
-       $this->initUploadLogs($uploadJob, $worker_id);
+        if ($worker_id == 1) $this->initUploadLogs($uploadJob, $worker_id);
     }
 
     public function processUploadData($uploadJob, $worker_id){
@@ -408,6 +408,10 @@ class UploadManager
         }
 
 
+    }
+
+    public function forTrail(){
+        $this->worker_model->forTrail("here");
     }
 
 }

@@ -31,7 +31,7 @@ class Worker extends WorkerController
 
         $getUploadJob = $this->upload_manager->getUploadJob();
         $getUploadDataJob = $this->upload_manager->getUploadDataJob();
-
+        $this->upload_manager->forTrail();
         if($getUploadJob){
             $this->upload_manager->processUpload($getUploadJob, $worker_id);
             return false;
