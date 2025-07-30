@@ -6,7 +6,6 @@ class UploadManager
 {   
     private $CI;
     private $worker_model;
-    private $time;
 
     function __construct() 
     {
@@ -18,7 +17,8 @@ class UploadManager
     }
 
     public function getUploadJob()
-    {
+    {   
+        $this->worker_model->forTrail("here");
         return $this->worker_model->getUploadJob();
     }
 
