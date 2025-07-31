@@ -322,7 +322,7 @@ class Worker_model extends CI_Model {
     }
 
     public function getAttendanceJob(){
-      $result = $this->db->where("(status = 'pending' OR status = 'ongoing') AND try > 0")
+        $result = $this->db->where("(status = 'pending' OR status = 'ongoing')")
             ->order_by('timestamp', 'ASC')
             ->get($this->tables[3])
             ->row();
@@ -376,7 +376,10 @@ class Worker_model extends CI_Model {
     }
 
     public function getUploadJob(){
-        $result = $this->db->query("SELECT * FROM upload_list WHERE status = 'pending' ORDER BY timestamp ASC LIMIT 1")->row();
+        $result = $this->db->where("(status = 'pending')")
+            ->order_by('timestamp', 'ASC')
+            ->get($this->tables[6])
+            ->row();
         $this->forTrail();
         return $result ? $result : false;
     }
