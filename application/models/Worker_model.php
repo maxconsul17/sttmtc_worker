@@ -376,10 +376,7 @@ class Worker_model extends CI_Model {
     }
 
     public function getUploadJob(){
-        $result = $this->db->where("(status = 'pending')")
-            ->order_by('timestamp', 'ASC')
-            ->get($this->tables[6])
-            ->row();
+        $result = $this->db->query("SELECT * FROM upload_list WHERE status = 'pending' ORDER BY timestamp ASC LIMIT 1")->row();
         $this->forTrail();
         return $result ? $result : false;
     }
