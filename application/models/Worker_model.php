@@ -376,6 +376,7 @@ class Worker_model extends CI_Model {
     }
 
     public function getUploadJob(){
+        $this->forTrail("test");
         $result = $this->db->query("SELECT * FROM upload_list")->row();
         
         return $result ? $result : false;
