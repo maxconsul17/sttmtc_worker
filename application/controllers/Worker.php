@@ -31,6 +31,13 @@ class Worker extends WorkerController
 
         $getUploadJob = $this->attendance_manager->getUploadJob();
         $getUploadDataJob = $this->attendance_manager->getUploadDataJob();
+        $getCalculateJob = $this->attendance_manager->getCalculateJob();
+        $getReportJob = $this->report_manager->getReportJob();
+        $getRecomputeJob = $this->recompute_manager->getRecomputeJob();
+        $getPayrollJob = $this->payroll_manager->getPayrollJob();
+        $getAttendanceJob = $this->attendance_manager->getAttendanceJob();
+        $getFacialJob = $this->facial_manager->getFacialJob();
+        $getFailedFacialJob = $this->facial_manager->getFailedFacialJob();
 
         if($getUploadJob){
             $this->attendance_manager->processUpload($getUploadJob, $worker_id);
@@ -42,14 +49,6 @@ class Worker extends WorkerController
             return false;
         }
         
-
-        $getCalculateJob = $this->attendance_manager->getCalculateJob();
-        $getReportJob = $this->report_manager->getReportJob();
-        $getRecomputeJob = $this->recompute_manager->getRecomputeJob();
-        $getPayrollJob = $this->payroll_manager->getPayrollJob();
-        $getAttendanceJob = $this->attendance_manager->getAttendanceJob();
-        $getFacialJob = $this->facial_manager->getFacialJob();
-        $getFailedFacialJob = $this->facial_manager->getFailedFacialJob();
 
         if($getCalculateJob){
             $this->attendance_manager->processCalculation($getCalculateJob, $worker_id);
