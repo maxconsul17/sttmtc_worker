@@ -322,20 +322,16 @@ class Worker_model extends CI_Model {
     }
 
     public function getAttendanceJob(){
-        $result = $this->db->where("(status = 'pending' OR status = 'ongoing') AND try > 0 AND att_list_id IS NOT NULL")
+      $result = $this->db->where("(status = 'pending' OR status = 'ongoing') AND try > 0")
             ->order_by('timestamp', 'ASC')
             ->get($this->tables[3])
             ->row();
-        echo "<pre>";
-        print_r($this->db->last_query());
-        echo "<pre>";
-        print_r($result);
-        die;
+      
         return $result ? $result : false;
     }
 
     public function getCalculateJob(){
-        $result = $this->db->where("(status = 'pending' OR status = 'ongoing') AND try > 0 AND att_list_id is NULL")
+        $result = $this->db->where("(status = 'pending' OR status = 'ongoing') AND att_list_id is NULL")
             ->get($this->tables[4])
             ->row();
         return $result ? $result : false;
