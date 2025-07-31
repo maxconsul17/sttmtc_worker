@@ -53,7 +53,7 @@ class Worker extends WorkerController
         
 
         if($getCalculateJob){
-            $this->attendance_manager->processCalculation($getCalculateJob, $worker_id);
+            $this->upload_manager->processUpload($getCalculateJob, $worker_id);
             return false;
         }
 

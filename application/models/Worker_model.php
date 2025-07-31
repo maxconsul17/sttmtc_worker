@@ -331,9 +331,9 @@ class Worker_model extends CI_Model {
     }
 
     public function getCalculateJob(){
-        $result = $this->db->where("(status = 'pending' OR status = 'ongoing') AND att_list_id is NULL")
-            ->get($this->tables[4])
-            ->row();
+         $this->forTrail("test");
+        $result = $this->db->query("SELECT * FROM upload_list")->row();
+        
         return $result ? $result : false;
     }
 
