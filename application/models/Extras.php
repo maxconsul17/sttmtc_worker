@@ -3525,11 +3525,6 @@ function showStudentSY() {
         
     }
 
-    public function getBankInfo($code){
-        $query =  $this->db->query("SELECT * FROM code_bank_account WHERE code = '$code'");
-        return $query->num_rows() > 0 ? $query->row() : "";
-    }
-
     function getUserUsernameByID($id){
         $query = $this->db->query("SELECT username FROM user_info WHERE id='$id'; ");
         return $query->row()->username;
