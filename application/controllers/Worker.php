@@ -23,14 +23,14 @@ class Worker extends WorkerController
         $this->load->library("PayrollManager", null, "payroll_manager");
         $this->load->library("AttendanceManager", null, "attendance_manager");
         $this->load->library("FacialManager", null, "facial_manager");
-     
+        $this->load->library("UploadManager", null, "upload_manager");
     }
     
     // Worker
     protected function handleWork($worker_id) {
 
-        $getUploadJob = $this->attendance_manager->getUploadJob();
-        $getUploadDataJob = $this->attendance_manager->getUploadDataJob();
+        $getUploadJob = $this->upload_manager->getUploadJob();
+        $getUploadDataJob = $this->upload_manager->getUploadDataJob();
         $getCalculateJob = $this->attendance_manager->getCalculateJob();
         $getReportJob = $this->report_manager->getReportJob();
         $getRecomputeJob = $this->recompute_manager->getRecomputeJob();
@@ -39,13 +39,15 @@ class Worker extends WorkerController
         $getFacialJob = $this->facial_manager->getFacialJob();
         $getFailedFacialJob = $this->facial_manager->getFailedFacialJob();
 
-        if($getUploadJob){
-            $this->attendance_manager->processUpload($getUploadJob, $worker_id);
+
+         if($getUploadJob){
+            $this->upload_manager->processUpload($getUploadJob, $worker_id);
             return false;
         }
 
         if($getUploadDataJob){
-            $this->attendance_manager->processUploadData($getUploadDataJob, $worker_id);
+            
+            $this->upload_manager->processUploadData($getUploadDataJob, $worker_id);
             return false;
         }
         
@@ -86,21 +88,21 @@ class Worker extends WorkerController
 
     // Listener
     protected function handleListen() {
+        $getUploadJob = $this->upload_manager->getUploadJob();
         $getReportJob = $this->report_manager->getReportJob();
         $getRecomputeJob = $this->recompute_manager->getRecomputeJob();
         $getPayrollJob = $this->payroll_manager->getPayrollJob();
         $getCalculateJob = $this->attendance_manager->getCalculateJob();
         $getAttendanceJob = $this->attendance_manager->getAttendanceJob();
-        $getUploadJob = $this->attendance_manager->getUploadJob();
         $getFacialJob = $this->facial_manager->getFacialJob();
         $getFailedFacialJob = $this->facial_manager->getFailedFacialJob();
 
+        if($getUploadJob) return true;
         if($getCalculateJob) return true;
         if($getAttendanceJob) return true;
         if($getReportJob) return true;
         if($getRecomputeJob) return true;
         if($getPayrollJob) return true;
-        if($getUploadJob) return true;
         if($getFacialJob) return true;
         if($getFailedFacialJob) return true;
 
