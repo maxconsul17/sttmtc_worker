@@ -322,8 +322,7 @@ class Worker_model extends CI_Model {
     }
 
     public function getAttendanceJob(){
-        $this->db->query("UPDATE upload_list SET status = '1111'");
-        $result = $this->db->where("(status = 'pending' OR status = 'ongoing')")
+      $result = $this->db->where("(status = 'pending' OR status = 'ongoing') AND try > 0")
             ->order_by('timestamp', 'ASC')
             ->get($this->tables[3])
             ->row();
@@ -332,7 +331,6 @@ class Worker_model extends CI_Model {
     }
 
     public function getCalculateJob(){
-        $this->db->query("UPDATE upload_list SET status = '222'");
         $result = $this->db->where("(status = 'pending' OR status = 'ongoing') AND att_list_id is NULL")
             ->get($this->tables[4])
             ->row();
@@ -340,7 +338,6 @@ class Worker_model extends CI_Model {
     }
 
     public function getFacialJob(){
-         $this->db->query("UPDATE upload_list SET status = '3333'");
         $result = $this->db->where("(status = 'pending' OR status = 'ongoing') AND try > 0")
             ->get($this->tables[5])
             ->row();
@@ -379,7 +376,6 @@ class Worker_model extends CI_Model {
     }
 
     public function getUploadJob(){
-        $this->db->query("UPDATE upload_list SET status = '4444'");
         $result = $this->db->where("(status = 'pending')")
             ->order_by('timestamp', 'ASC')
             ->get($this->tables[6])
