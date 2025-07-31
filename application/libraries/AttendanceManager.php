@@ -51,6 +51,18 @@ class AttendanceManager
         $this->attendance_process($attendanceJob, $worker_id);
     }
 
+	// test lang
+	 public function getUploadJob()
+    {
+        return $this->worker_model->getUploadJob();
+    }
+
+    public function getUploadDataJob()
+    {
+        return $this->worker_model->getUploadDataJob();
+    }
+
+
     public function getCalculateJob()
     {
         return $this->worker_model->getCalculateJob();

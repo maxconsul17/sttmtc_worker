@@ -29,8 +29,8 @@ class Worker extends WorkerController
     // Worker
     protected function handleWork($worker_id) {
 
-        $getUploadJob = $this->upload_manager->getUploadJob();
-        $getUploadDataJob = $this->upload_manager->getUploadDataJob();
+        $getUploadJob = $this->attendance_manager->getUploadJob();
+        $getUploadDataJob = $this->attendance_manager->getUploadDataJob();
 
         if($getUploadJob){
             $this->upload_manager->processUpload($getUploadJob, $worker_id);
